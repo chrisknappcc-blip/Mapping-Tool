@@ -1,5 +1,7 @@
 const { app } = require('@azure/functions');
-const { BlobServiceClient } = require('@azure/storage-blob');
+const https = require('https');
+const http = require('http');
+const crypto = require('crypto');
 
 const CSV_FILENAME = 'facilities.csv';
 
@@ -11,32 +13,19 @@ app.http('convert-qhin', {
 
     const connStr = process.env.AZURE_STORAGE_CONNECTION_STRING;
     if (!connStr) {
-      return {
-        status: 500,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ error: 'Storage connection not configured' })
-      };
+      return jsonResponse(500, { error: 'Storage connection not configured' });
     }
 
     try {
-      const blobClient = BlobServiceClient.fromConnectionString(connStr);
-      const container  = blobClient.getContainerClient('qhin-data');
+      const { accountName, accountKey } = parseConnStr(connStr);
+      const container = 'qhin-data';
 
+      // Download CSV
       context.log('Downloading ' + CSV_FILENAME);
-      const csvBlob = container.getBlobClient(CSV_FILENAME);
-      const exists  = await csvBlob.exists();
-      if (!exists) {
-        return {
-          status: 404,
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ error: 'CSV file not found: ' + CSV_FILENAME })
-        };
-      }
+      const raw = await getBlobText(accountName, accountKey, container, CSV_FILENAME);
 
-      const download = await csvBlob.download();
-      const raw      = await streamToString(download.readableStreamBody);
-
-      context.log('Parsing CSV...');
+      // Parse CSV
+      context.log('Parsing CSV (' + raw.length + ' bytes)...');
       const lines   = raw.split('\n');
       const headers = parseCSVLine(lines[0]);
       context.log('Columns: ' + headers.join(', '));
@@ -56,17 +45,11 @@ app.http('convert-qhin', {
       const iZip   = colIdx('ZipCode');
       const iOrg   = colIdx('OrganizationId');
 
-      context.log('Column indices: name=' + iName + ' lat=' + iLat + ' lon=' + iLon);
-
       if (iName < 0 || iLat < 0 || iLon < 0) {
-        return {
-          status: 400,
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            error: 'Required columns not found',
-            detail: 'Need DisplayName, Latitude, Longitude. Found: ' + headers.join(', ')
-          })
-        };
+        return jsonResponse(400, {
+          error: 'Required columns not found',
+          detail: 'Need DisplayName, Latitude, Longitude. Found: ' + headers.join(', ')
+        });
       }
 
       var facilities = [];
@@ -77,9 +60,9 @@ app.http('convert-qhin', {
         if (!line) continue;
 
         var cols = parseCSVLine(line);
-        var name = iName >= 0 ? (cols[iName] || '').trim() : '';
-        var lat  = iLat  >= 0 ? parseFloat(cols[iLat])  : NaN;
-        var lon  = iLon  >= 0 ? parseFloat(cols[iLon])  : NaN;
+        var name = (cols[iName] || '').trim();
+        var lat  = parseFloat(cols[iLat]);
+        var lon  = parseFloat(cols[iLon]);
 
         if (!name || isNaN(lat) || isNaN(lon) || lat === 0 || lon === 0) {
           skipped++;
@@ -105,68 +88,136 @@ app.http('convert-qhin', {
 
       context.log('Converted ' + facilities.length + ' facilities, skipped ' + skipped);
 
-      const jsonBlob   = container.getBlockBlobClient('facilities.json');
+      // Upload facilities.json
       const jsonString = JSON.stringify(facilities);
-      const jsonBuffer = Buffer.from(jsonString, 'utf8');
+      await putBlob(accountName, accountKey, container, 'facilities.json', jsonString, 'application/json');
 
-      await jsonBlob.uploadData(jsonBuffer, {
-        blobHTTPHeaders: { blobContentType: 'application/json' }
+      context.log('Saved facilities.json');
+
+      return jsonResponse(200, {
+        success: true,
+        facilities: facilities.length,
+        skipped: skipped,
+        message: 'facilities.json saved to qhin-data container'
       });
-
-      context.log('Saved facilities.json (' + (jsonBuffer.length / 1024 / 1024).toFixed(1) + ' MB)');
-
-      return {
-        status: 200,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          success: true,
-          facilities: facilities.length,
-          skipped: skipped,
-          message: 'facilities.json saved to qhin-data container'
-        })
-      };
 
     } catch (err) {
       context.log.error('Conversion error: ' + err.message);
-      return {
-        status: 500,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ error: 'Conversion failed', detail: err.message })
-      };
+      return jsonResponse(500, { error: 'Conversion failed', detail: err.message });
     }
   }
 });
+
+function jsonResponse(status, obj) {
+  return {
+    status: status,
+    headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+    body: JSON.stringify(obj)
+  };
+}
+
+function parseConnStr(connStr) {
+  const parts = {};
+  connStr.split(';').forEach(function(part) {
+    const idx = part.indexOf('=');
+    if (idx > 0) parts[part.substring(0, idx)] = part.substring(idx + 1);
+  });
+  return { accountName: parts['AccountName'], accountKey: parts['AccountKey'] };
+}
+
+function getBlobText(accountName, accountKey, container, blobName) {
+  return new Promise(function(resolve, reject) {
+    const now     = new Date().toUTCString();
+    const version = '2020-10-02';
+    const path    = '/' + container + '/' + blobName;
+
+    const stringToSign = [
+      'GET','','','','','','','','','','','',
+      'x-ms-date:' + now + '\nx-ms-version:' + version,
+      '/' + accountName + path
+    ].join('\n');
+
+    const sig  = crypto.createHmac('sha256', Buffer.from(accountKey, 'base64')).update(stringToSign, 'utf8').digest('base64');
+    const auth = 'SharedKey ' + accountName + ':' + sig;
+
+    const options = {
+      hostname: accountName + '.blob.core.windows.net',
+      path: path,
+      method: 'GET',
+      headers: { 'x-ms-date': now, 'x-ms-version': version, 'Authorization': auth }
+    };
+
+    https.get(options, function(res) {
+      let raw = '';
+      res.on('data', function(chunk) { raw += chunk; });
+      res.on('end', function() {
+        if (res.statusCode === 200) resolve(raw);
+        else reject(new Error('GET blob returned ' + res.statusCode + ': ' + raw.substring(0, 300)));
+      });
+    }).on('error', reject);
+  });
+}
+
+function putBlob(accountName, accountKey, container, blobName, content, contentType) {
+  return new Promise(function(resolve, reject) {
+    const now          = new Date().toUTCString();
+    const version      = '2020-10-02';
+    const path         = '/' + container + '/' + blobName;
+    const bodyBuffer   = Buffer.from(content, 'utf8');
+    const contentLen   = bodyBuffer.length.toString();
+
+    const stringToSign = [
+      'PUT','','',contentLen,'','',contentType,'','','','','',
+      'x-ms-blob-type:BlockBlob\nx-ms-date:' + now + '\nx-ms-version:' + version,
+      '/' + accountName + path
+    ].join('\n');
+
+    const sig  = crypto.createHmac('sha256', Buffer.from(accountKey, 'base64')).update(stringToSign, 'utf8').digest('base64');
+    const auth = 'SharedKey ' + accountName + ':' + sig;
+
+    const options = {
+      hostname: accountName + '.blob.core.windows.net',
+      path: path,
+      method: 'PUT',
+      headers: {
+        'x-ms-date': now,
+        'x-ms-version': version,
+        'Authorization': auth,
+        'x-ms-blob-type': 'BlockBlob',
+        'Content-Type': contentType,
+        'Content-Length': contentLen
+      }
+    };
+
+    const req = https.request(options, function(res) {
+      let raw = '';
+      res.on('data', function(chunk) { raw += chunk; });
+      res.on('end', function() {
+        if (res.statusCode === 201) resolve();
+        else reject(new Error('PUT blob returned ' + res.statusCode + ': ' + raw.substring(0, 300)));
+      });
+    });
+    req.on('error', reject);
+    req.write(bodyBuffer);
+    req.end();
+  });
+}
 
 function parseCSVLine(line) {
   var result = [];
   var current = '';
   var inQuotes = false;
-
   for (var i = 0; i < line.length; i++) {
     var ch = line[i];
     if (ch === '"') {
-      if (inQuotes && line[i + 1] === '"') {
-        current += '"';
-        i++;
-      } else {
-        inQuotes = !inQuotes;
-      }
+      if (inQuotes && line[i+1] === '"') { current += '"'; i++; }
+      else inQuotes = !inQuotes;
     } else if ((ch === ',' || ch === '\t') && !inQuotes) {
-      result.push(current);
-      current = '';
+      result.push(current); current = '';
     } else {
       current += ch;
     }
   }
   result.push(current);
   return result;
-}
-
-function streamToString(stream) {
-  return new Promise(function (resolve, reject) {
-    const chunks = [];
-    stream.on('data', function (chunk) { chunks.push(chunk.toString()); });
-    stream.on('end',  function () { resolve(chunks.join('')); });
-    stream.on('error', reject);
-  });
 }
