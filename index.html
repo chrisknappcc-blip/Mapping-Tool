@@ -1507,29 +1507,22 @@ async function getFacilities(lat, lon, radius, types) {
     return facilityCache[cacheKey];
   }
 
-  // NPI always enabled — routed through Azure Function proxy
-  setLoaderMsg('Fetching from OSM + NPI + CMS…');
+  setLoaderMsg('Fetching market data…');
 
   var osmPromise = queryOverpass(buildOverpassQuery(lat, lon, radius, types))
     .then(function(raw) { return raw.filter(function(f){ return !shouldExclude(f); }); })
     .catch(function(e) { console.warn('OSM failed:', e.message); return []; });
 
-  var npiPromise = fetchNPIFacilities(lat, lon, radius, types)
-    .then(function(facs){ return facs.filter(function(f){ return !shouldExclude(f); }); })
-    .catch(function(e){ console.warn('NPI failed:', e.message); return []; });
-
   var cmsPromise = fetchCMSFacilities(lat, lon, radius, types)
     .catch(function(e){ console.warn('CMS failed:', e.message); return []; });
 
-  var results_arr = await Promise.all([osmPromise, npiPromise, cmsPromise]);
+  var results_arr = await Promise.all([osmPromise, cmsPromise]);
   var osmFacs = results_arr[0];
-  var npiFacs = results_arr[1];
-  var cmsFacs = results_arr[2];
+  var cmsFacs = results_arr[1];
 
-  var merged = mergeFacilities(osmFacs, npiFacs);
-  merged = mergeFacilities(merged, cmsFacs);
+  var merged = mergeFacilities(osmFacs, cmsFacs);
 
-  console.log('OSM: '+osmFacs.length+' | NPI: '+npiFacs.length+' | CMS: '+cmsFacs.length+' | Merged: '+merged.length);
+  console.log('OSM: '+osmFacs.length+' | CMS: '+cmsFacs.length+' | Merged: '+merged.length);
 
   facilityCache[cacheKey] = merged;
   return merged;
