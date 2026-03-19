@@ -1,9 +1,10 @@
 const { app } = require('@azure/functions');
 const https = require('https');
-const http = require('http');
-const crypto = require('crypto');
 
-const CSV_FILENAME = 'facilities.csv';
+const CSV_FILENAME    = 'facilities.csv';
+const JSON_FILENAME   = 'facilities.json';
+const ACCOUNT_NAME    = 'carepathiqdata';
+const CONTAINER       = 'qhin-data';
 
 app.http('convert-qhin', {
   methods: ['GET'],
@@ -11,21 +12,21 @@ app.http('convert-qhin', {
   handler: async (request, context) => {
     context.log('QHIN CSV conversion started');
 
-    const connStr = process.env.AZURE_STORAGE_CONNECTION_STRING;
-    if (!connStr) {
-      return jsonResponse(500, { error: 'Storage connection not configured' });
+    const sasToken = process.env.AZURE_STORAGE_SAS_TOKEN || '';
+    if (!sasToken) {
+      return jsonResponse(500, { error: 'SAS token not configured' });
     }
 
-    try {
-      const { accountName, accountKey } = parseConnStr(connStr);
-      const container = 'qhin-data';
+    const baseUrl = 'https://' + ACCOUNT_NAME + '.blob.core.windows.net/' + CONTAINER + '/';
 
+    try {
       // Download CSV
-      context.log('Downloading ' + CSV_FILENAME);
-      const raw = await getBlobText(accountName, accountKey, container, CSV_FILENAME);
+      const csvUrl = baseUrl + CSV_FILENAME + sasToken;
+      context.log('Downloading CSV...');
+      const raw = await fetchText(csvUrl);
+      context.log('Downloaded ' + raw.length + ' bytes');
 
       // Parse CSV
-      context.log('Parsing CSV (' + raw.length + ' bytes)...');
       const lines   = raw.split('\n');
       const headers = parseCSVLine(lines[0]);
       context.log('Columns: ' + headers.join(', '));
@@ -45,10 +46,12 @@ app.http('convert-qhin', {
       const iZip   = colIdx('ZipCode');
       const iOrg   = colIdx('OrganizationId');
 
+      context.log('name=' + iName + ' lat=' + iLat + ' lon=' + iLon);
+
       if (iName < 0 || iLat < 0 || iLon < 0) {
         return jsonResponse(400, {
           error: 'Required columns not found',
-          detail: 'Need DisplayName, Latitude, Longitude. Found: ' + headers.join(', ')
+          found: headers.join(', ')
         });
       }
 
@@ -88,11 +91,12 @@ app.http('convert-qhin', {
 
       context.log('Converted ' + facilities.length + ' facilities, skipped ' + skipped);
 
-      // Upload facilities.json
+      // Upload facilities.json via PUT
       const jsonString = JSON.stringify(facilities);
-      await putBlob(accountName, accountKey, container, 'facilities.json', jsonString, 'application/json');
+      const jsonUrl    = baseUrl + JSON_FILENAME + sasToken;
+      await putText(jsonUrl, jsonString, 'application/json');
 
-      context.log('Saved facilities.json');
+      context.log('Saved facilities.json (' + (jsonString.length / 1024 / 1024).toFixed(1) + ' MB)');
 
       return jsonResponse(200, {
         success: true,
@@ -116,76 +120,32 @@ function jsonResponse(status, obj) {
   };
 }
 
-function parseConnStr(connStr) {
-  const parts = {};
-  connStr.split(';').forEach(function(part) {
-    const idx = part.indexOf('=');
-    if (idx > 0) parts[part.substring(0, idx)] = part.substring(idx + 1);
-  });
-  return { accountName: parts['AccountName'], accountKey: parts['AccountKey'] };
-}
-
-function getBlobText(accountName, accountKey, container, blobName) {
+function fetchText(url) {
   return new Promise(function(resolve, reject) {
-    const now     = new Date().toUTCString();
-    const version = '2020-10-02';
-    const path    = '/' + container + '/' + blobName;
-
-    const stringToSign = [
-      'GET','','','','','','','','','','','',
-      'x-ms-date:' + now + '\nx-ms-version:' + version,
-      '/' + accountName + path
-    ].join('\n');
-
-    const sig  = crypto.createHmac('sha256', Buffer.from(accountKey, 'base64')).update(stringToSign, 'utf8').digest('base64');
-    const auth = 'SharedKey ' + accountName + ':' + sig;
-
-    const options = {
-      hostname: accountName + '.blob.core.windows.net',
-      path: path,
-      method: 'GET',
-      headers: { 'x-ms-date': now, 'x-ms-version': version, 'Authorization': auth }
-    };
-
-    https.get(options, function(res) {
+    https.get(url, function(res) {
       let raw = '';
       res.on('data', function(chunk) { raw += chunk; });
       res.on('end', function() {
         if (res.statusCode === 200) resolve(raw);
-        else reject(new Error('GET blob returned ' + res.statusCode + ': ' + raw.substring(0, 300)));
+        else reject(new Error('GET returned ' + res.statusCode + ': ' + raw.substring(0, 300)));
       });
     }).on('error', reject);
   });
 }
 
-function putBlob(accountName, accountKey, container, blobName, content, contentType) {
+function putText(url, content, contentType) {
   return new Promise(function(resolve, reject) {
-    const now          = new Date().toUTCString();
-    const version      = '2020-10-02';
-    const path         = '/' + container + '/' + blobName;
-    const bodyBuffer   = Buffer.from(content, 'utf8');
-    const contentLen   = bodyBuffer.length.toString();
-
-    const stringToSign = [
-      'PUT','','',contentLen,'','',contentType,'','','','','',
-      'x-ms-blob-type:BlockBlob\nx-ms-date:' + now + '\nx-ms-version:' + version,
-      '/' + accountName + path
-    ].join('\n');
-
-    const sig  = crypto.createHmac('sha256', Buffer.from(accountKey, 'base64')).update(stringToSign, 'utf8').digest('base64');
-    const auth = 'SharedKey ' + accountName + ':' + sig;
+    const bodyBuffer = Buffer.from(content, 'utf8');
+    const urlObj     = new URL(url);
 
     const options = {
-      hostname: accountName + '.blob.core.windows.net',
-      path: path,
-      method: 'PUT',
+      hostname: urlObj.hostname,
+      path:     urlObj.pathname + urlObj.search,
+      method:   'PUT',
       headers: {
-        'x-ms-date': now,
-        'x-ms-version': version,
-        'Authorization': auth,
-        'x-ms-blob-type': 'BlockBlob',
-        'Content-Type': contentType,
-        'Content-Length': contentLen
+        'Content-Type':   contentType,
+        'Content-Length': bodyBuffer.length,
+        'x-ms-blob-type': 'BlockBlob'
       }
     };
 
@@ -193,8 +153,8 @@ function putBlob(accountName, accountKey, container, blobName, content, contentT
       let raw = '';
       res.on('data', function(chunk) { raw += chunk; });
       res.on('end', function() {
-        if (res.statusCode === 201) resolve();
-        else reject(new Error('PUT blob returned ' + res.statusCode + ': ' + raw.substring(0, 300)));
+        if (res.statusCode === 200 || res.statusCode === 201) resolve();
+        else reject(new Error('PUT returned ' + res.statusCode + ': ' + raw.substring(0, 300)));
       });
     });
     req.on('error', reject);
