@@ -1,10 +1,6 @@
 const { app } = require('@azure/functions');
-const { BlobServiceClient } = require('@azure/storage-blob');
-
-// In-memory cache so we don't re-parse the Excel on every request
-let cachedData = null;
-let cacheTime  = 0;
-const CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
+const https = require('https');
+const crypto = require('crypto');
 
 app.http('qhin-data', {
   methods: ['GET'],
@@ -12,58 +8,18 @@ app.http('qhin-data', {
   handler: async (request, context) => {
     context.log('QHIN data requested');
 
-    // Return cached data if still fresh
-    if (cachedData && (Date.now() - cacheTime) < CACHE_TTL_MS) {
-      context.log('Returning cached QHIN data (' + cachedData.length + ' facilities)');
-      return {
-        status: 200,
-        headers: {
-          'Content-Type': 'application/json',
-          'Access-Control-Allow-Origin': '*',
-          'Cache-Control': 'public, max-age=3600'
-        },
-        body: JSON.stringify({ facilities: cachedData, count: cachedData.length })
-      };
-    }
-
     const connStr = process.env.AZURE_STORAGE_CONNECTION_STRING;
     if (!connStr) {
-      return {
-        status: 500,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ error: 'Storage connection not configured' })
-      };
+      return jsonResponse(500, { error: 'Storage connection not configured' });
     }
 
     try {
-      // Connect to blob storage
-      const blobClient = BlobServiceClient.fromConnectionString(connStr);
-      const container  = blobClient.getContainerClient('qhin-data');
-      const blob       = container.getBlobClient('facilities.json');
+      const { accountName, accountKey } = parseConnStr(connStr);
+      const container = 'qhin-data';
+      const blob      = 'facilities.json';
 
-      // Check the file exists
-      const exists = await blob.exists();
-      if (!exists) {
-        return {
-          status: 404,
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ 
-            error: 'QHIN data not yet uploaded',
-            message: 'Upload facilities.json to the qhin-data container in Azure Blob Storage'
-          })
-        };
-      }
-
-      // Download and parse
-      const download = await blob.download();
-      const raw = await streamToString(download.readableStreamBody);
-      const facilities = JSON.parse(raw);
-
-      // Cache it
-      cachedData = facilities;
-      cacheTime  = Date.now();
-
-      context.log('Loaded ' + facilities.length + ' QHIN facilities from blob storage');
+      const data = await getBlobText(accountName, accountKey, container, blob);
+      const facilities = JSON.parse(data);
 
       return {
         status: 200,
@@ -74,23 +30,73 @@ app.http('qhin-data', {
         },
         body: JSON.stringify({ facilities: facilities, count: facilities.length })
       };
-
     } catch (err) {
       context.log.error('QHIN data error: ' + err.message);
-      return {
-        status: 502,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ error: 'Failed to load QHIN data', detail: err.message })
-      };
+      return jsonResponse(502, { error: 'Failed to load QHIN data', detail: err.message });
     }
   }
 });
 
-function streamToString(stream) {
-  return new Promise(function (resolve, reject) {
-    const chunks = [];
-    stream.on('data', function (chunk) { chunks.push(chunk.toString()); });
-    stream.on('end',  function () { resolve(chunks.join('')); });
-    stream.on('error', reject);
+function jsonResponse(status, obj) {
+  return {
+    status: status,
+    headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+    body: JSON.stringify(obj)
+  };
+}
+
+function parseConnStr(connStr) {
+  const parts = {};
+  connStr.split(';').forEach(function(part) {
+    const idx = part.indexOf('=');
+    if (idx > 0) parts[part.substring(0, idx)] = part.substring(idx + 1);
+  });
+  return {
+    accountName: parts['AccountName'],
+    accountKey:  parts['AccountKey']
+  };
+}
+
+function getBlobText(accountName, accountKey, container, blobName) {
+  return new Promise(function(resolve, reject) {
+    const now     = new Date().toUTCString();
+    const version = '2020-10-02';
+    const path    = '/' + container + '/' + blobName;
+
+    const stringToSign = [
+      'GET', '', '', '', '', '', '', '', '', '', '', '',
+      'x-ms-date:' + now + '\nx-ms-version:' + version,
+      '/' + accountName + path
+    ].join('\n');
+
+    const sig = crypto.createHmac('sha256', Buffer.from(accountKey, 'base64'))
+                      .update(stringToSign, 'utf8')
+                      .digest('base64');
+
+    const auth = 'SharedKey ' + accountName + ':' + sig;
+    const host = accountName + '.blob.core.windows.net';
+
+    const options = {
+      hostname: host,
+      path:     path,
+      method:   'GET',
+      headers: {
+        'x-ms-date':    now,
+        'x-ms-version': version,
+        'Authorization': auth
+      }
+    };
+
+    https.get(options, function(res) {
+      let raw = '';
+      res.on('data', function(chunk) { raw += chunk; });
+      res.on('end', function() {
+        if (res.statusCode === 200) {
+          resolve(raw);
+        } else {
+          reject(new Error('Blob storage returned ' + res.statusCode + ': ' + raw.substring(0, 200)));
+        }
+      });
+    }).on('error', reject);
   });
 }
