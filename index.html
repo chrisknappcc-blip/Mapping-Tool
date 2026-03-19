@@ -1,0 +1,4245 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta http-equiv="X-UA-Compatible" content="IE=edge" />
+<!-- SharePoint: allow full functionality -->
+<meta name="ms.teams-channel" content="general" />
+<title>CarePathIQ — Market Mapper | Care Continuity</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
+<style>
+:root {
+  --bg:       #f1f3f7;
+  --panel:    #ffffff;
+  --border:   #e2e6ed;
+  --accent:   #1649c9;
+  --accent-h: #0f3498;
+  --red:      #dc2626;
+  --green:    #16a34a;
+  --amber:    #d97706;
+  --text:     #0f172a;
+  --text-2:   #334155;
+  --muted:    #64748b;
+  --muted-2:  #94a3b8;
+  --navy:     #0d1b3e;
+  --header-h: 44px;
+  --ctrl-h:   48px;
+  --pin-h:    38px;
+  --shadow-sm:  0 1px 3px rgba(0,0,0,.08), 0 1px 2px rgba(0,0,0,.05);
+  --shadow-md:  0 4px 12px rgba(0,0,0,.10), 0 2px 4px rgba(0,0,0,.06);
+  --shadow-lg:  0 8px 24px rgba(0,0,0,.12), 0 3px 8px rgba(0,0,0,.06);
+  --radius:   7px;
+  --radius-lg:10px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;font-family:'DM Sans',system-ui,sans-serif;background:var(--bg);color:var(--text)}
+body{display:flex;flex-direction:column}
+
+/* ── Header ──────────────────────────────────────────────────────────────── */
+#header{
+  background:var(--navy);
+  height:var(--header-h);
+  flex-shrink:0;
+  display:flex;
+  align-items:center;
+  padding:0 16px;
+  gap:0;
+  box-shadow:0 2px 8px rgba(0,0,0,.25);
+  position:relative;
+  z-index:10;
+}
+#header::after{
+  content:'';
+  position:absolute;
+  bottom:0;left:0;right:0;
+  height:2px;
+  background:linear-gradient(90deg,#1649c9,#3b82f6,#06b6d4);
+}
+.hdr-logo{
+  font-family:'DM Mono',monospace;
+  font-weight:500;
+  font-size:15px;
+  letter-spacing:.02em;
+  color:#fff;
+  display:flex;
+  align-items:center;
+  gap:0;
+}
+.hdr-logo .care{color:#93c5fd}
+.hdr-logo .path{color:#fff}
+.hdr-logo .iq{color:#34d399;font-size:12px;vertical-align:super;margin-left:1px}
+.hdr-sep{width:1px;height:20px;background:rgba(255,255,255,.15);margin:0 14px}
+.hdr-subtitle{font-size:11px;font-weight:500;color:rgba(255,255,255,.5);letter-spacing:.06em;text-transform:uppercase}
+.hdr-right{margin-left:auto;display:flex;align-items:center;gap:12px}
+.hdr-badge{font-size:10px;font-weight:600;color:rgba(255,255,255,.4);letter-spacing:.08em;text-transform:uppercase;
+  border:1px solid rgba(255,255,255,.12);border-radius:4px;padding:2px 7px}
+
+/* ── Controls bar ────────────────────────────────────────────────────────── */
+#controls{
+  background:var(--panel);
+  border-bottom:1px solid var(--border);
+  padding:0 14px;
+  height:var(--ctrl-h);
+  flex-shrink:0;
+  display:flex;
+  gap:8px;
+  align-items:center;
+  box-shadow:var(--shadow-sm);
+  position:relative;
+  z-index:500;
+}
+#controls label{
+  display:flex;
+  flex-direction:column;
+  font-size:9.5px;
+  font-weight:600;
+  text-transform:uppercase;
+  letter-spacing:.07em;
+  color:var(--muted);
+  gap:2px;
+}
+input,select{
+  font-family:'DM Sans',sans-serif;
+  font-size:12.5px;
+  padding:5px 9px;
+  border:1.5px solid var(--border);
+  border-radius:var(--radius);
+  background:#fff;
+  color:var(--text);
+  outline:none;
+  transition:border-color .15s, box-shadow .15s;
+}
+input:focus,select:focus{
+  border-color:var(--accent);
+  box-shadow:0 0 0 3px rgba(22,73,201,.1);
+}
+input::placeholder{color:var(--muted-2)}
+
+.ctrl-btn{
+  font-family:'DM Sans',sans-serif;
+  font-size:12.5px;
+  font-weight:600;
+  padding:6px 16px;
+  background:var(--accent);
+  color:#fff;
+  border:none;
+  border-radius:var(--radius);
+  cursor:pointer;
+  transition:background .15s, transform .1s, box-shadow .15s;
+  box-shadow:0 2px 6px rgba(22,73,201,.3);
+  letter-spacing:.01em;
+  white-space:nowrap;
+}
+.ctrl-btn:hover{background:var(--accent-h);box-shadow:0 3px 10px rgba(22,73,201,.4)}
+.ctrl-btn:active{transform:translateY(1px)}
+.ctrl-btn:disabled{opacity:.45;cursor:not-allowed;box-shadow:none}
+.ctrl-btn.secondary{
+  background:transparent;
+  color:var(--text-2);
+  border:1.5px solid var(--border);
+  box-shadow:none;
+}
+.ctrl-btn.secondary:hover{background:var(--bg);border-color:var(--accent);color:var(--accent)}
+
+/* ── Facility type multi-select ──────────────────────────────────────────── */
+.ctrl-ftype-wrap{display:flex;flex-direction:column;gap:2px;position:relative}
+.ctrl-ftype-lbl{font-size:9.5px;font-weight:600;text-transform:uppercase;letter-spacing:.07em;color:var(--muted)}
+#ftypeBtn{
+  display:flex;align-items:center;gap:6px;
+  padding:5px 9px;
+  border:1.5px solid var(--border);
+  border-radius:var(--radius);
+  background:#fff;
+  color:var(--text);
+  font-family:'DM Sans',sans-serif;
+  font-size:12.5px;
+  min-width:140px;
+  cursor:pointer;
+  transition:border-color .15s, box-shadow .15s;
+}
+#ftypeBtn:hover{border-color:var(--accent);box-shadow:0 0 0 3px rgba(22,73,201,.08)}
+.ftypeArrow{margin-left:auto;font-size:9px;color:var(--muted)}
+#ftypeMenu{
+  display:none;position:fixed;z-index:9999;
+  background:#fff;
+  border:1.5px solid var(--border);
+  border-radius:var(--radius-lg);
+  box-shadow:var(--shadow-lg);
+  padding:5px 0;
+  min-width:180px;
+  animation:fadeIn .12s ease;
+}
+@keyframes fadeIn{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:translateY(0)}}
+#ftypeMenu.open{display:block}
+.ftype-item label{
+  display:flex;align-items:center;gap:9px;
+  padding:7px 14px;
+  cursor:pointer;
+  font-size:12.5px;font-weight:400;
+  color:var(--text-2);
+  text-transform:none;letter-spacing:0;white-space:nowrap;
+  transition:background .1s;
+}
+.ftype-item label:hover{background:#f8fafc}
+.ftype-item input[type=checkbox]{width:13px;height:13px;cursor:pointer;accent-color:var(--accent);flex-shrink:0}
+.ftype-divider{border-top:1px solid var(--border);margin:4px 0}
+.ftype-actions{display:flex}
+.ftype-actions button{
+  flex:1;padding:6px;background:none;border:none;
+  font-size:11px;font-weight:600;cursor:pointer;
+  font-family:'DM Sans',sans-serif;
+  transition:background .1s;
+}
+.ftype-actions button:first-child{color:var(--accent)}
+.ftype-actions button:last-child{color:var(--muted)}
+.ftype-actions button:hover{background:#f8fafc}
+
+/* ── Pin bar ─────────────────────────────────────────────────────────────── */
+#pinBar{
+  background:var(--bg);
+  border-bottom:1px solid var(--border);
+  padding:5px 14px;
+  flex-shrink:0;
+  display:flex;
+  gap:6px;
+  align-items:center;
+  flex-wrap:nowrap;
+  overflow-x:auto;
+}
+/* Each section is a grouped card */
+.pin-group{
+  display:flex;
+  align-items:center;
+  gap:7px;
+  background:var(--panel);
+  border:1px solid var(--border);
+  border-radius:7px;
+  padding:4px 10px;
+  height:32px;
+  box-shadow:var(--shadow-sm);
+  flex-shrink:0;
+}
+.pin-group-lbl{
+  font-size:9px;font-weight:700;text-transform:uppercase;
+  letter-spacing:.08em;color:var(--muted);
+  padding-right:5px;
+  border-right:1px solid var(--border);
+  margin-right:2px;
+  white-space:nowrap;
+}
+.pin-group label{
+  display:flex;align-items:center;gap:4px;
+  font-size:10px;font-weight:600;
+  text-transform:uppercase;letter-spacing:.05em;color:var(--muted);
+}
+.pin-group input[type=color]{
+  width:24px;height:22px;padding:1px 2px;
+  border-radius:4px;cursor:pointer;
+  border:1.5px solid var(--border);
+  background:none;
+  transition:border-color .15s;
+}
+.pin-group input[type=color]:hover{border-color:var(--accent)}
+.pin-group input[type=range]{
+  width:68px;cursor:pointer;accent-color:var(--accent);
+  vertical-align:middle;
+}
+.pin-size-val{font-size:10px;color:var(--muted);min-width:20px;font-variant-numeric:tabular-nums}
+.pin-upload-lbl{display:flex;align-items:center;gap:4px;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--muted)}
+.pin-upload-lbl input[type=file]{font-size:10px;max-width:120px;color:var(--text)}
+.icon-preview{width:22px;height:22px;object-fit:cover;border-radius:4px;border:1px solid var(--border);display:none}
+.pin-clear-btn{
+  background:none;border:1.5px solid var(--border);border-radius:4px;
+  padding:1px 6px;font-size:11px;cursor:pointer;color:var(--muted-2);
+  transition:all .15s;line-height:1.4;
+}
+.pin-clear-btn:hover{background:#fee2e2;color:var(--red);border-color:#fca5a5}
+
+/* ── Error bar ───────────────────────────────────────────────────────────── */
+#errorBar{
+  display:none;
+  background:#fef2f2;
+  border-bottom:1px solid #fecaca;
+  color:#991b1b;
+  font-size:12px;
+  font-weight:500;
+  padding:7px 16px;
+  flex-shrink:0;
+}
+#errorBar.visible{display:flex;align-items:center;gap:8px}
+#errorBar::before{content:'⚠';font-size:13px}
+
+/* ── Main layout ─────────────────────────────────────────────────────────── */
+#container{display:flex;flex:1;overflow:hidden;position:relative}
+#map{flex:1;min-width:0}
+
+/* ── Right panel ─────────────────────────────────────────────────────────── */
+#rightPanel{
+  width:315px;flex-shrink:0;
+  background:var(--panel);
+  border-left:1px solid var(--border);
+  display:flex;flex-direction:column;
+  overflow:hidden;
+  box-shadow:-2px 0 8px rgba(0,0,0,.04);
+}
+#tabs{
+  display:flex;
+  border-bottom:1px solid var(--border);
+  background:var(--bg);
+  flex-shrink:0;
+  padding:0 6px;
+  gap:2px;
+}
+.tab{
+  flex:1;padding:10px 4px 8px;
+  text-align:center;
+  font-size:10px;font-weight:700;
+  text-transform:uppercase;letter-spacing:.06em;
+  cursor:pointer;color:var(--muted);
+  border-bottom:2px solid transparent;
+  transition:color .15s, border-color .15s;
+  margin-bottom:-1px;
+}
+.tab:hover{color:var(--text-2)}
+.tab.active{color:var(--accent);border-bottom-color:var(--accent);background:var(--panel)}
+.panel{display:none;padding:14px;overflow-y:auto;flex:1;font-size:13px;line-height:1.6}
+.panel.active{display:block}
+
+/* ── Panel content ───────────────────────────────────────────────────────── */
+.sec{
+  font-size:9.5px;font-weight:700;text-transform:uppercase;
+  letter-spacing:.1em;color:var(--muted-2);
+  margin:16px 0 7px;
+  display:flex;align-items:center;gap:6px;
+}
+.sec::after{content:'';flex:1;height:1px;background:var(--border)}
+.sec:first-child{margin-top:0}
+.row{
+  display:flex;justify-content:space-between;align-items:center;
+  padding:5px 0;
+  border-bottom:1px solid var(--border);
+  font-size:12.5px;gap:8px;
+}
+.row:last-child{border-bottom:none}
+.row .lbl{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text-2)}
+.val{font-weight:700;color:var(--accent);white-space:nowrap;font-variant-numeric:tabular-nums}
+.val.warn{color:var(--red)}
+.val.ok{color:var(--green)}
+.chip{display:inline-flex;align-items:center;padding:2px 8px;border-radius:99px;font-size:10.5px;font-weight:600;letter-spacing:.02em}
+.chip-red{background:#fef2f2;color:#b91c1c;border:1px solid #fecaca}
+.chip-blue{background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe}
+.chip-green{background:#f0fdf4;color:#15803d;border:1px solid #bbf7d0}
+.chip-yellow{background:#fffbeb;color:#b45309;border:1px solid #fde68a}
+
+/* Summary box */
+.summary-box{
+  background:linear-gradient(135deg,#f0f6ff 0%,#f8faff 100%);
+  border:1px solid #bfdbfe;
+  border-radius:var(--radius-lg);
+  padding:12px 14px;
+  font-size:12px;
+  line-height:1.75;
+  color:#1e3a5f;
+  margin-top:4px;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.8);
+}
+
+/* Gauge bar */
+.gauge-wrap{margin:4px 0 7px}
+.gauge-track{background:#e2e8f0;border-radius:99px;height:6px;overflow:hidden}
+.gauge-fill{height:100%;border-radius:99px;transition:width .6s cubic-bezier(.4,0,.2,1)}
+
+.empty{color:var(--muted-2);font-size:12px;margin-top:8px;font-style:italic}
+
+/* ── Legend ──────────────────────────────────────────────────────────────── */
+#legend{
+  position:absolute;bottom:20px;left:10px;z-index:900;
+  background:rgba(255,255,255,.97);
+  border:1px solid var(--border);
+  border-radius:var(--radius-lg);
+  padding:10px 12px;
+  font-size:11px;
+  max-width:195px;max-height:230px;
+  overflow-y:auto;
+  box-shadow:var(--shadow-md);
+  backdrop-filter:blur(4px);
+}
+#legend .leg-title{
+  font-weight:700;font-size:10px;
+  text-transform:uppercase;letter-spacing:.08em;
+  margin-bottom:7px;color:var(--muted);
+}
+.leg-row{display:flex;align-items:center;gap:7px;padding:3px 0}
+
+/* ── Loader ──────────────────────────────────────────────────────────────── */
+#loader{
+  display:none;position:absolute;inset:0;
+  background:rgba(241,243,247,.88);
+  backdrop-filter:blur(3px);
+  z-index:9999;
+  align-items:center;justify-content:center;
+  flex-direction:column;gap:12px;
+  font-size:13px;font-weight:600;color:var(--accent);
+}
+#loader.visible{display:flex}
+.spin{
+  width:32px;height:32px;
+  border:3px solid #dbeafe;
+  border-top-color:var(--accent);
+  border-radius:50%;
+  animation:spin .65s linear infinite;
+}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ── Assign tab inputs ───────────────────────────────────────────────────── */
+#assignSearch{
+  width:100%;padding:6px 9px;
+  border:1.5px solid var(--border);border-radius:var(--radius);
+  font-family:'DM Sans',sans-serif;
+  font-size:12px;margin-bottom:8px;
+  background:#fff;color:var(--text);
+  transition:border-color .15s;
+}
+#assignSearch:focus{border-color:var(--accent);outline:none}
+.assign-row select{
+  font-family:'DM Sans',sans-serif;
+  font-size:11.5px;
+}
+
+/* ── Competitor filter dropdown (compact, lives in controls bar) ─────────── */
+.ctrl-comp-wrap { display:flex; flex-direction:column; gap:2px; position:relative; }
+.ctrl-comp-lbl  { font-size:9.5px; font-weight:600; text-transform:uppercase; letter-spacing:.07em; color:var(--muted); }
+#compFilterBtn {
+  display:flex; align-items:center; gap:6px;
+  padding:5px 9px;
+  border:1.5px solid var(--border);
+  border-radius:var(--radius);
+  background:#fff;
+  color:var(--text);
+  font-family:'DM Sans',sans-serif;
+  font-size:12.5px;
+  min-width:148px;
+  cursor:pointer;
+  transition:border-color .15s, box-shadow .15s;
+}
+#compFilterBtn:hover { border-color:var(--accent); box-shadow:0 0 0 3px rgba(22,73,201,.08); }
+#compFilterBtn.has-filter { border-color:var(--accent); background:#eff6ff; color:var(--accent); font-weight:600; }
+.compFilterArrow { margin-left:auto; font-size:9px; color:var(--muted); }
+#compFilterMenu {
+  display:none; position:fixed; z-index:9999;
+  background:#fff;
+  border:1.5px solid var(--border);
+  border-radius:var(--radius-lg);
+  box-shadow:var(--shadow-lg);
+  padding:5px 0;
+  min-width:220px;
+  max-height:260px;
+  overflow-y:auto;
+  animation:fadeIn .12s ease;
+}
+#compFilterMenu.open { display:block; }
+.cfilter-item label {
+  display:flex; align-items:center; gap:9px;
+  padding:6px 14px;
+  cursor:pointer;
+  font-size:12px; font-weight:400;
+  color:var(--text-2);
+  text-transform:none; letter-spacing:0; white-space:nowrap;
+  transition:background .1s;
+}
+.cfilter-item label:hover { background:#f8fafc; }
+.cfilter-item input[type=checkbox] { width:13px; height:13px; cursor:pointer; accent-color:var(--accent); flex-shrink:0; }
+.cfilter-swatch { width:9px; height:9px; border-radius:50%; flex-shrink:0; }
+.cfilter-count  { margin-left:auto; font-size:10px; color:var(--muted-2); font-variant-numeric:tabular-nums; }
+.cfilter-divider { border-top:1px solid var(--border); margin:4px 0; }
+.cfilter-actions { display:flex; }
+.cfilter-actions button {
+  flex:1; padding:6px; background:none; border:none;
+  font-size:11px; font-weight:600; cursor:pointer;
+  font-family:'DM Sans',sans-serif; transition:background .1s;
+}
+.cfilter-actions button:first-child { color:var(--accent); }
+.cfilter-actions button:last-child  { color:var(--muted); }
+.cfilter-actions button:hover { background:#f8fafc; }
+.cfilter-focus-row {
+  display:flex; align-items:center; gap:8px;
+  padding:6px 14px; font-size:12px; color:var(--text-2);
+  border-top:1px solid var(--border); margin-top:2px;
+}
+.cfilter-focus-row label { cursor:pointer; font-weight:600; }
+.cfilter-focus-row input[type=checkbox] { accent-color:#d97706; cursor:pointer; }
+</style>
+</head>
+<body>
+
+<div id="sp-warning" style="display:none;background:#fff3cd;color:#856404;
+  padding:8px 16px;font-size:12px;font-family:DM Sans,sans-serif;
+  border-bottom:1px solid #ffc107;text-align:center">
+  ⚠ For full functionality, open this file through SharePoint — not downloaded locally.
+  In SharePoint, click the file name to open it in the browser.
+</div>
+<script>
+// Show warning if opened as file:// instead of http://
+if (window.location.protocol === 'file:') {
+  document.getElementById('sp-warning').style.display = 'block';
+}
+</script>
+<div id="header">
+  <div class="hdr-logo">
+    <span class="care">Care</span><span class="path">Path</span><span class="iq">IQ</span>
+  </div>
+  <div class="hdr-sep"></div>
+  <span class="hdr-subtitle">Dynamic Market Mapper</span>
+  <div class="hdr-right">
+    <span class="hdr-badge">Care Continuity</span>
+  </div>
+</div>
+
+<!-- Main search controls -->
+<div id="controls">
+  <label>ZIP Code
+    <input id="zipInput" value="" placeholder="Enter ZIP Code" style="width:90px"/>
+  </label>
+  <label>Target System
+    <input id="targetInput" value="" placeholder="e.g. Mass General Brigham" style="width:190px"/>
+  </label>
+  <label>Radius
+    <select id="radiusSelect">
+      <option value="8000">5 miles</option>
+      <option value="16000">10 miles</option>
+      <option value="24000">15 miles</option>
+      <option value="32000">20 miles</option>
+      <option value="40000" selected>25 miles</option>
+    </select>
+  </label>
+  <div class="ctrl-ftype-wrap">
+    <span class="ctrl-ftype-lbl">Facility Type</span>
+    <button type="button" id="ftypeBtn" onclick="toggleFtypeMenu(event)">
+      <span id="ftypeSummary">All Types</span><span class="ftypeArrow">▾</span>
+    </button>
+  </div>
+  <!-- Menu lives outside #controls label scope to avoid CSS inheritance -->
+  <div id="ftypeMenu">
+    <div class="ftype-item"><label><input type="checkbox" value="hospital" checked onchange="updateFtypeSummary()"><span>Hospital</span></label></div>
+    <div class="ftype-item"><label><input type="checkbox" value="clinic" checked onchange="updateFtypeSummary()"><span>Clinic</span></label></div>
+    <div class="ftype-item"><label><input type="checkbox" value="ed" checked onchange="updateFtypeSummary()"><span>Emergency Dept (ED)</span></label></div>
+    <div class="ftype-item"><label><input type="checkbox" value="outpatient" checked onchange="updateFtypeSummary()"><span>Outpatient</span></label></div>
+    <div class="ftype-item"><label><input type="checkbox" value="rehab" checked onchange="updateFtypeSummary()"><span>Rehab</span></label></div>
+    <div class="ftype-item"><label><input type="checkbox" value="urgent_care" checked onchange="updateFtypeSummary()"><span>Urgent Care</span></label></div>
+    <div class="ftype-item"><label><input type="checkbox" value="specialist" checked onchange="updateFtypeSummary()"><span>Specialists</span></label></div>
+    <div class="ftype-divider"></div>
+    <div class="ftype-actions">
+      <button type="button" onclick="setAllFtypes(true)">All</button>
+      <button type="button" onclick="setAllFtypes(false)">None</button>
+    </div>
+  </div>
+  <label>Display Mode
+    <select id="displayMode">
+      <option value="rollup">Roll Up by System</option>
+      <option value="individual" selected>Individual Locations</option>
+    </select>
+  </label>
+  <label style="flex-direction:row;align-items:center;gap:6px;cursor:pointer" title="NPI Registry requires a server-side proxy — unavailable in hosted mode">
+    <input type="checkbox" id="npiToggle" style="width:14px;height:14px;accent-color:var(--accent);cursor:pointer"/>
+    <span style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--muted-2);white-space:nowrap;text-decoration:line-through" title="NPI requires server proxy">NPI Data</span>
+  </label>
+  <div class="ctrl-comp-wrap" id="compFilterWrap" style="display:none">
+    <span class="ctrl-comp-lbl">Competitor Systems</span>
+    <button type="button" id="compFilterBtn" onclick="toggleCompFilterMenu(event)">
+      <span id="compFilterSummary">All Competitors</span><span class="compFilterArrow">▾</span>
+    </button>
+  </div>
+  <!-- Competitor filter dropdown menu (portal-positioned, appended to body) -->
+  <div id="compFilterMenu">
+    <div id="compFilterItems"></div>
+    <div class="cfilter-divider"></div>
+    <div class="cfilter-focus-row">
+      <input type="checkbox" id="compFocusChk" onchange="onFocusChkChange(this)"/>
+      <label for="compFocusChk">Focus mode (hide others)</label>
+    </div>
+    <div class="cfilter-divider"></div>
+    <div class="cfilter-actions">
+      <button onclick="setAllCompFilter(true)">Select All</button>
+      <button onclick="setAllCompFilter(false)">Clear</button>
+    </div>
+  </div>
+  <button id="runBtn" class="ctrl-btn" onclick="runSearch()">Analyze Market</button>
+  <button id="exportBtn" class="ctrl-btn secondary" onclick="exportReport()" style="display:none" title="Export map + insights as PDF">&#8595; Export PDF</button>
+</div>
+
+<!-- Pin customisation bar — grouped sections -->
+<div id="pinBar">
+
+  <!-- Target Pin group -->
+  <div class="pin-group">
+    <span class="pin-group-lbl">Target Pin</span>
+    <label>Color <input type="color" id="targetColor" value="#e02424"/></label>
+    <label>Size
+      <input type="range" id="targetPinSize" min="18" max="60" value="38"
+        oninput="onPinSizeInput(this.value)"/>
+      <span id="targetPinSizeVal" class="pin-size-val">38</span>
+    </label>
+    <label class="pin-upload-lbl">Icon
+      <input type="file" id="targetIconUpload" accept="image/png,image/jpeg" onchange="handleIconUpload('target',event)"/>
+    </label>
+    <img id="targetIconPreview" class="icon-preview" src="" alt=""/>
+    <button class="pin-clear-btn" onclick="clearIcon('target')" title="Clear icon">✕</button>
+  </div>
+
+  <!-- Independent group -->
+  <div class="pin-group">
+    <span class="pin-group-lbl">Independent</span>
+    <label>Color <input type="color" id="independentColor" value="#6b7280"/></label>
+  </div>
+
+  <!-- Export Logo group -->
+  <div class="pin-group">
+    <span class="pin-group-lbl">Export Logo</span>
+    <label class="pin-upload-lbl">
+      <input type="file" id="ccLogoUpload" accept="image/png,image/jpeg,image/svg+xml" onchange="handleLogoUpload(event)"/>
+    </label>
+    <img id="ccLogoPreview" class="icon-preview" style="width:38px;height:20px;object-fit:contain" src="" alt=""/>
+    <button class="pin-clear-btn" onclick="clearLogo()" title="Remove logo">✕</button>
+  </div>
+
+</div>
+
+<div id="errorBar"><span id="errorMsg"></span></div>
+
+<div id="container">
+  <div id="loader"><div class="spin"></div><span id="loaderMsg">Fetching market data…</span></div>
+  <div id="map"></div>
+  <div id="legend"><div class="leg-title">Systems</div><div id="legItems"></div></div>
+  <div id="rightPanel">
+    <div id="tabs">
+      <div class="tab active" data-tab="insights" onclick="switchTab('insights')">Insights</div>
+      <div class="tab" data-tab="account" onclick="switchTab('account')">Target</div>
+      <div class="tab" data-tab="assign" onclick="switchTab('assign')">Assign</div>
+    </div>
+    <div id="insights" class="panel active"><p class="empty">Run a search to see insights.</p></div>
+    <div id="account" class="panel"><p class="empty">Run a search to see target details.</p></div>
+    <div id="assign" class="panel"><p class="empty">Run a search to reassign facilities.</p></div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script>
+// ════════════════════════════════════════════════════════
+//  GLOBALS
+// ════════════════════════════════════════════════════════
+// ═══ END EMBEDDED LOCATION DATA ═══
+
+// ═══ EMBEDDED LOADER FUNCTION ═══
+// Classify an embedded facility's type from its display name.
+// Priority order matters — more specific checks run first.
+// Unclassified facilities default to 'clinic' (general care provider).
+function classifyEmbeddedType(name) {
+  var n = (name || '').toLowerCase();
+
+  // ── Emergency / ED ────────────────────────────────────────────────────────
+  if (/\bemergency (care center|department|dept|room|services)\b/.test(n)
+   || /\b(emergency center|freestanding ed|stand-alone ed)\b/.test(n)) return 'ed';
+
+  // ── Urgent Care ───────────────────────────────────────────────────────────
+  if (/\b(urgent care|walk-?in clinic|express care|immediate care|quick care|same.?day clinic|breeze urgent)\b/.test(n)) return 'urgent_care';
+
+  // ── Rehab / Long-Term Care ────────────────────────────────────────────────
+  if (/\b(skilled nursing|nursing home|nursing facility|snf|long.?term care|hospice|inpatient rehab|acute rehab|rehabilitation hospital|rehab hospital|physical therapy center|physical therapy clinic|\bpt clinic\b|occupational therapy center|speech therapy center|cardiac rehab|cardiac rehabilitation|rehab network|rehabilitation network|physical therapy.*rehab|rehab.*physical therapy|\brehabilitation\b.*\bnetwork\b)\b/.test(n)
+   || (/\b(physical therapy|rehabilitation|rehab)\b/.test(n) && !/\bhospital\b/.test(n))) return 'rehab';
+
+  // ── Outpatient Procedure / Diagnostic ────────────────────────────────────
+  if (/\b(imaging center|radiology center|diagnostic center|infusion center|dialysis center|ambulatory surgery|ambulatory surgical|surgery center|surgical center|outpatient surgery|day surgery|endoscopy center|colonoscopy center|\bcath lab\b)\b/.test(n)) return 'outpatient';
+
+  // ── Hospital — must be a standalone inpatient facility ───────────────────
+  // Name must END with hospital, or be "X Hospital" not "Hospital Y Clinic"
+  // Explicitly exclude sub-programs named after the hospital system
+  if (/\bhospital\b/.test(n)
+   && !/\b(hospital (sleep|cardiac rehab|rehabilitation network|multi-specialty|transplant|comprehensive|behavioral|radiology|imaging|lab|pharmacy|group|physicians|associates|clinic|center|department|program|services|outpatient|network|cancer|home|visiting|foundation|auxiliary))\b/.test(n)
+   && !/\b(sleep center|rehab|cardiac rehab|imaging|lab|pharmacy|group|physicians|associates|clinic|cancer center|behavioral|program|network|foundation)\b/.test(n)) return 'hospital';
+
+  // ── Specialist ────────────────────────────────────────────────────────────
+  if (/\b(cardiol|oncol|neurolog|orthoped|orthopaed|gastroenterol|pulmonol|rheumatol|nephrolog|urolog|endocrinol|hematol|ophthalmol|otolaryng|\bent\b|psychiatr|obstetric|gynecol|\bobgyn\b|sports medicine|spine center|spine clinic|pain management|pain center|cancer center|cancer institute|heart center|vascular surgery|thoracic surgery|bariatric|fertility|sleep medicine|allerg|immunol|dermatol|neurosurg|hand surgery|shoulder clinic|knee clinic|joint replacement|plastic surg|oral surg|colon|rectal|podiat|audiol|\biv infusion\b|wound care|sloan|farber|\bmsk\b|\bmdacc\b|kettering|\bDana.Farber\b)\b/.test(n)) return 'specialist';
+
+  // ── Clinic / Primary Care (default for medical practices) ─────────────────
+  if (/\b(primary care|family medicine|family practice|family health|internal medicine|general practice|pediatric|\bmd\b|\bdo\b|\bpa-c\b|medical group|physician group|physicians|medical associates|health clinic|community health|federally qualified|fqhc|rural health|\bva clinic\b|veterans|community clinic|neighborhood health|student health|occupational health|employee health|corporate health|telehealth|telemedicine)\b/.test(n)) return 'clinic';
+
+  // ── Default: treat as clinic rather than showing in all type searches ─────
+  // This prevents specialty-sounding names (allergy, etc.) from appearing
+  // when the user has filtered to hospitals/ED/urgent care only.
+  return 'clinic';
+}
+
+function getEmbeddedFacilities(selectedTypes) {
+  if (typeof EMBEDDED_LOCATIONS === 'undefined' || !EMBEDDED_LOCATIONS.length) return [];
+  var typeSet = selectedTypes ? new Set(selectedTypes) : null;
+  var ALL_TYPES = ['hospital','clinic','ed','outpatient','rehab','urgent_care','specialist'];
+  var allSelected = !typeSet || typeSet.size === ALL_TYPES.length;
+
+  return EMBEDDED_LOCATIONS
+    .filter(function(loc) {
+      if (allSelected) return true;
+      var t = classifyEmbeddedType(loc.n);
+      // If we can't classify it, include it in all searches
+      if (!t) return true;
+      return typeSet.has(t);
+    })
+    .map(function(loc) {
+      return {
+        id:   loc.id,
+        type: 'excel',
+        lat:  loc.lat,
+        lon:  loc.lon,
+        dom:  loc.dom || '',
+        tags: {
+          name:     loc.n    || '',
+          address:  loc.addr || '',
+          city:     loc.city || '',
+          state:    loc.st   || '',
+          postcode: loc.zip  || ''
+        },
+        _embeddedSystem: loc.sys || '',
+        _facType: classifyEmbeddedType(loc.n)
+      };
+    });
+}
+// ═══ END EMBEDDED LOADER ═══
+
+let mapInstance = null;
+let markers = [];
+let lastData = {};
+
+// CMS Provider data — loaded from cms_providers.json if present
+// Place cms_providers.json in the same folder as this HTML file
+let cmsData = null;
+let cmsLoadAttempted = false;
+
+async function loadCMSData() {
+  if (cmsLoadAttempted) return cmsData;
+  cmsLoadAttempted = true;
+  try {
+    const res = await fetch('./cms_providers.json');
+    if (!res.ok) {
+      console.info('cms_providers.json not found — CMS data source disabled. Run build_cms_data.py to enable it.');
+      return null;
+    }
+    cmsData = await res.json();
+    console.log('CMS data loaded: ' + cmsData.total + ' facilities across ' + Object.keys(cmsData.by_state).length + ' states');
+    return cmsData;
+  } catch(e) {
+    console.info('CMS data not available:', e.message);
+    return null;
+  }
+}
+const customIcons = { target: null, competitor: null };
+// Care Continuity logo for PDF export — persisted across sessions
+let ccLogoDataUrl = null;
+try {
+  const savedLogo = localStorage.getItem('cpiq_cc_logo');
+  if (savedLogo) {
+    ccLogoDataUrl = savedLogo;
+    // Restore preview after DOM ready
+    window.addEventListener('DOMContentLoaded', function() {
+      var prev = document.getElementById('ccLogoPreview');
+      if (prev && ccLogoDataUrl) { prev.src = ccLogoDataUrl; prev.style.display = 'inline-block'; }
+    });
+  }
+} catch(e) {}
+
+const SYSTEM_COLORS = ['#2563eb','#16a34a','#9333ea','#ea580c','#0891b2','#be185d','#854d0e','#374151','#0d9488','#7c3aed'];
+const colorMap = {};
+let colorIdx = 0;
+
+// ════════════════════════════════════════════════════════
+//  MAP INIT
+// ════════════════════════════════════════════════════════
+function initMap() {
+  if (mapInstance) return;
+  mapInstance = L.map('map').setView([42.36, -71.05], 10);
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+    attribution: '© <a href="https://www.openstreetmap.org/copyright">OSM</a> © <a href="https://carto.com/">CARTO</a>',
+    subdomains: 'abcd',
+    maxZoom: 19
+  }).addTo(mapInstance);
+  mapInstance.createPane('targetPane');
+  mapInstance.getPane('targetPane').style.zIndex = 650;
+  mapInstance.createPane('defaultPane');
+  mapInstance.getPane('defaultPane').style.zIndex = 400;
+}
+
+// ════════════════════════════════════════════════════════
+//  UI HELPERS
+// ════════════════════════════════════════════════════════
+function showError(msg) {
+  const b = document.getElementById('errorBar');
+  const s = document.getElementById('errorMsg');
+  if (s) s.textContent = msg; else b.textContent = msg;
+  b.classList.add('visible');
+}
+function clearError() { document.getElementById('errorBar').classList.remove('visible'); }
+function setLoaderMsg(msg) {
+  const el = document.getElementById('loaderMsg');
+  if (el) el.textContent = msg;
+}
+
+function switchTab(id) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.querySelector(`.tab[data-tab="${id}"]`).classList.add('active');
+  document.getElementById(id).classList.add('active');
+}
+
+function clearMarkers() {
+  markers.forEach(m => mapInstance.removeLayer(m));
+  markers = [];
+}
+
+// ════════════════════════════════════════════════════════
+//  ICON / PIN CUSTOMISATION
+// ════════════════════════════════════════════════════════
+function handleIconUpload(which, e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    customIcons[which] = ev.target.result;
+    const prev = document.getElementById(which + 'IconPreview');
+    prev.src = ev.target.result;
+    prev.style.display = 'inline-block';
+  };
+  reader.readAsDataURL(file);
+}
+
+function handleLogoUpload(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    ccLogoDataUrl = ev.target.result;
+    try { localStorage.setItem('cpiq_cc_logo', ccLogoDataUrl); } catch(err) {}
+    const prev = document.getElementById('ccLogoPreview');
+    prev.src = ccLogoDataUrl;
+    prev.style.display = 'inline-block';
+  };
+  reader.readAsDataURL(file);
+}
+
+function clearLogo() {
+  ccLogoDataUrl = null;
+  try { localStorage.removeItem('cpiq_cc_logo'); } catch(err) {}
+  document.getElementById('ccLogoUpload').value = '';
+  const prev = document.getElementById('ccLogoPreview');
+  prev.src = '';
+  prev.style.display = 'none';
+}
+
+function clearIcon(which) {
+  customIcons[which] = null;
+  document.getElementById(which + 'IconUpload').value = '';
+  const prev = document.getElementById(which + 'IconPreview');
+  prev.src = '';
+  prev.style.display = 'none';
+}
+
+// ── Drop-pin SVG generator ──────────────────────────────────────────────────
+// Produces a classic Google-Maps-style teardrop pin as an inline SVG data URL.
+// If imgDataUrl is provided, the image is clipped into the pin head circle.
+// size = overall pin height in px; the head is ~60% of height.
+// Results are cached — identical color+size combinations are never regenerated.
+var _pinIconCache = {};
+function makePinIcon(color, size, imgDataUrl) {
+  // Cache key — skip cache when using custom image (data URL too large to key on)
+  if (!imgDataUrl) {
+    var cacheKey = color + '_' + size;
+    if (_pinIconCache[cacheKey]) return _pinIconCache[cacheKey];
+  }
+  size = size || 32;
+  var w   = Math.round(size * 0.72);   // pin width
+  var h   = size;
+  var r   = Math.round(w / 2);         // head radius
+  var cx  = r;                         // center x
+  var cy  = r;                         // center y (top of bounding box)
+  var stroke = '#fff';
+  var sw     = Math.max(1, Math.round(size / 18));
+
+  // Clip path id — unique per call to avoid SVG id collisions
+  var uid = 'pc' + Math.random().toString(36).slice(2,7);
+
+  var imgTag = '';
+  if (imgDataUrl) {
+    imgTag =
+      '<defs>' +
+        '<clipPath id="' + uid + '">' +
+          '<circle cx="' + cx + '" cy="' + cy + '" r="' + (r - sw - 1) + '"/>' +
+        '</clipPath>' +
+      '</defs>' +
+      '<image href="' + imgDataUrl + '" ' +
+        'x="' + (cx - r + sw + 1) + '" y="' + (cy - r + sw + 1) + '" ' +
+        'width="' + ((r - sw - 1) * 2) + '" height="' + ((r - sw - 1) * 2) + '" ' +
+        'clip-path="url(#' + uid + ')" preserveAspectRatio="xMidYMid slice"/>';
+  }
+
+  // Teardrop path: circle head + pointed tail
+  var tailX = cx;
+  var tailY = h - 1;
+  // Control points for smooth tail
+  var cp1x = cx - r * 0.45, cp1y = cy + r * 0.85;
+  var cp2x = cx + r * 0.45, cp2y = cy + r * 0.85;
+
+  var path =
+    'M ' + cx + ' ' + tailY + ' ' +
+    'C ' + cp1x + ' ' + cp1y + ' ' + (cx - r) + ' ' + (cy + r * 0.4) + ' ' + (cx - r) + ' ' + cy + ' ' +
+    'A ' + r + ' ' + r + ' 0 1 1 ' + (cx + r) + ' ' + cy + ' ' +
+    'C ' + (cx + r) + ' ' + (cy + r * 0.4) + ' ' + cp2x + ' ' + cp2y + ' ' + cx + ' ' + tailY + ' Z';
+
+  var svg =
+    '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" ' +
+    'width="' + w + '" height="' + h + '" viewBox="0 0 ' + w + ' ' + h + '">' +
+    // Drop shadow
+    '<filter id="sh' + uid + '" x="-30%" y="-10%" width="160%" height="160%">' +
+      '<feDropShadow dx="0" dy="1" stdDeviation="1.5" flood-color="rgba(0,0,0,0.35)"/>' +
+    '</filter>' +
+    '<g filter="url(#sh' + uid + ')">' +
+      '<path d="' + path + '" fill="' + color + '" stroke="' + stroke + '" stroke-width="' + sw + '"/>' +
+    '</g>' +
+    imgTag +
+    // If no image, show a small white dot in the centre of the head
+    (!imgDataUrl ? '<circle cx="' + cx + '" cy="' + cy + '" r="' + Math.max(2, Math.round(r*0.28)) + '" fill="rgba(255,255,255,0.85)"/>' : '') +
+    '</svg>';
+
+  var dataUrl = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+  var icon = L.icon({
+    iconUrl:     dataUrl,
+    iconSize:    [w, h],
+    iconAnchor:  [w/2, h],
+    popupAnchor: [0, -h]
+  });
+  if (!imgDataUrl) _pinIconCache[color + '_' + size] = icon;
+  return icon;
+}
+
+// Kept for backward compat with custom image uploads (wraps image in a pin)
+function makeLeafletIcon(dataUrl, size) {
+  // When a user uploads a custom image we still render it inside a pin shape
+  return makePinIcon('#555555', size || 32, dataUrl);
+}
+
+// ════════════════════════════════════════════════════════
+//  DATA FETCHING
+// ════════════════════════════════════════════════════════
+
+// ── Geocoding ────────────────────────────────────────────
+async function getCoords(zip) {
+  const url = 'https://nominatim.openstreetmap.org/search?postalcode=' + encodeURIComponent(zip) + '&country=USA&format=json&limit=1';
+  const res = await fetch(url, { headers: {'Accept-Language':'en'} });
+  if (!res.ok) throw new Error('Geocoding HTTP ' + res.status);
+  const data = await res.json();
+  return data[0] ? { lat: parseFloat(data[0].lat), lon: parseFloat(data[0].lon) } : null;
+}
+
+// ── Overpass (OSM) ───────────────────────────────────────
+const OVERPASS_URL = 'https://overpass-api.de/api/interpreter';
+
+async function queryOverpass(q) {
+  const body = 'data=' + encodeURIComponent(q);
+  const hdrs = {'Content-Type':'application/x-www-form-urlencoded'};
+  for (var attempt = 1; attempt <= 2; attempt++) {
+    const ctrl = new AbortController();
+    const timer = setTimeout(function(){ ctrl.abort(); }, 45000);
+    try {
+      setLoaderMsg(attempt === 1 ? 'Querying OSM/Overpass…' : 'Retrying Overpass…');
+      const res = await fetch(OVERPASS_URL, {method:'POST', headers:hdrs, body, signal:ctrl.signal});
+      clearTimeout(timer);
+      if (res.status === 429 || res.status === 504) {
+        await new Promise(function(r){ setTimeout(r, 3000); });
+        continue;
+      }
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const json = await res.json();
+      if (!json.elements) throw new Error('Unexpected Overpass response');
+      return json.elements;
+    } catch(e) {
+      clearTimeout(timer);
+      if (e.name === 'AbortError') {
+        if (attempt === 2) throw new Error('Overpass timed out. Try a smaller radius.');
+      } else { throw e; }
+    }
+  }
+  throw new Error('Overpass unavailable.');
+}
+
+// ── NPI Registry ─────────────────────────────────────────
+// Maps facility type selections to NPI taxonomy codes
+// Full taxonomy list: https://nucc.org/index.php/code-sets-mainmenu-41
+const NPI_TAXONOMY = {
+  hospital: [
+    '282N00000X',  // General Acute Care Hospital
+    '282NC0060X',  // Critical Access Hospital
+    '282NR1301X',  // Rural Acute Care Hospital
+    '273R00000X',  // Psychiatric Hospital
+    '276400000X',  // Rehabilitation Hospital
+    '283Q00000X',  // Psychiatric Residential Treatment
+    '282NC2000X',  // Children Hospital
+    '283X00000X',  // Chronic Disease Hospital
+    '291900000X',  // Military Hospital
+  ],
+  clinic: [
+    '261QP2300X',  // Primary Care Clinic
+    '261QF0400X',  // Federally Qualified Health Center
+    '261QR1300X',  // Rural Health Clinic
+    '261QC1500X',  // Community Health Clinic
+    '261QM2500X',  // Medical Specialty Clinic
+    '261QA0600X',  // Ambulatory Family Planning Facility
+    '261QA1903X',  // Ambulatory Surgical Center
+  ],
+  ed: [
+    '282N00000X',  // General Hospital (has ED)
+    '261QE0002X',  // Emergency Care Center (standalone ED)
+    '282NC0060X',  // Critical Access (has ED)
+  ],
+  outpatient: [
+    '261QA1903X',  // Ambulatory Surgical Center
+    '261QM2500X',  // Medical Specialty Clinic
+    '261QP2300X',  // Primary Care
+    '261QR0400X',  // Rehabilitation Outpatient
+    '261QI0500X',  // Infusion Therapy
+    '261QB0400X',  // Birthing Center
+  ],
+  rehab: [
+    '276400000X',  // Rehabilitation Hospital
+    '261QR0400X',  // Outpatient Rehabilitation
+    '315D00000X',  // Inpatient Hospice
+    '311500000X',  // Alzheimer/Dementia
+    '315P00000X',  // Inpatient Psychiatric Residential
+  ],
+  urgent_care: [
+    '261QU0200X',  // Urgent Care Center
+  ],
+  specialist: [
+    '207R00000X',  // Internal Medicine
+    '207RC0000X',  // Cardiovascular Disease
+    '207RN0300X',  // Nephrology
+    '207RP1001X',  // Pulmonary Disease
+    '207RG0100X',  // Gastroenterology
+    '207RE0101X',  // Endocrinology
+    '207RH0000X',  // Hematology
+    '207RI0200X',  // Infectious Disease
+    '207RR0500X',  // Rheumatology
+    '207Q00000X',  // Family Medicine
+    '208000000X',  // Pediatrics
+    '207P00000X',  // Emergency Medicine
+    '207T00000X',  // Neurological Surgery
+    '2084N0400X',  // Neurology
+    '207L00000X',  // Anesthesiology
+    '207N00000X',  // Dermatology
+    '207X00000X',  // Orthopaedic Surgery
+    '207Y00000X',  // Otolaryngology
+    '207V00000X',  // Obstetrics & Gynecology
+    '207W00000X',  // Ophthalmology
+    '208600000X',  // Surgery (General)
+    '208C00000X',  // Colon & Rectal Surgery
+    '208G00000X',  // Thoracic Surgery
+    '207RO0001X',  // Oncology (Medical)
+    '2086S0122X',  // Surgical Oncology
+    '2085R0001X',  // Radiation Oncology
+    '2085R0202X',  // Diagnostic Radiology
+    '207U00000X',  // Physical Medicine & Rehab
+    '2084P0800X',  // Psychiatry
+    '101YP2500X',  // Psychology
+    '363LF0000X',  // Family Practice NP
+    '363A00000X',  // Physician Assistant
+  ]
+};
+
+// Convert radius in meters to a reasonable state+zip search strategy
+// NPI API doesn't support radius search — we search by state derived from ZIP geocode
+// and filter results by distance ourselves
+async function getStateFromCoords(lat, lon) {
+  try {
+    const url = 'https://nominatim.openstreetmap.org/reverse?lat=' + lat + '&lon=' + lon + '&format=json&zoom=5';
+    const res = await fetch(url, { headers: {'Accept-Language':'en'} });
+    if (!res.ok) return null;
+    const data = await res.json();
+    return data.address && data.address['ISO3166-2-lvl4']
+      ? data.address['ISO3166-2-lvl4'].replace('US-','')
+      : (data.address && data.address.state_code ? data.address.state_code : null);
+  } catch(e) { return null; }
+}
+
+// Haversine distance in meters
+function haversineMeters(lat1, lon1, lat2, lon2) {
+  const R = 6371000;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a = Math.sin(dLat/2)*Math.sin(dLat/2)
+    + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)
+    * Math.sin(dLon/2)*Math.sin(dLon/2);
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+}
+
+// Query NPI API — supports both NPI-1 (individuals) and NPI-2 (organizations)
+async function queryNPI(taxonomyCode, state, enumerationType, limit) {
+  enumerationType = enumerationType || 'NPI-2';
+  limit = limit || 200;
+  var url = 'https://npiregistry.cms.hhs.gov/api/?version=2.1'
+    + '&taxonomy_description=' + encodeURIComponent(taxonomyCode)
+    + '&state=' + encodeURIComponent(state)
+    + '&limit=' + limit
+    + '&enumeration_type=' + enumerationType;
+  try {
+    var res = await fetch(url);
+    if (!res.ok) return [];
+    var data = await res.json();
+    return data.results || [];
+  } catch(e) { return []; }
+}
+
+// Build a display name for NPI-1 (individual) results
+// Uses practice name if available, otherwise "Dr. Last, First — Specialty"
+function npi1DisplayName(basic, taxonomy) {
+  // Many NPI-1 records have an organization/practice name in authorized_official fields
+  // or in the basic.organization_name (group practice billing under individual NPI)
+  if (basic.organization_name) return basic.organization_name;
+  var last  = basic.last_name  || '';
+  var first = basic.first_name || '';
+  var mid   = basic.middle_name ? ' ' + basic.middle_name : '';
+  var cred  = basic.credential ? ', ' + basic.credential : '';
+  var spec  = taxonomy && taxonomy.desc ? ' — ' + taxonomy.desc : '';
+  return (last ? last + ', ' + first + mid + cred : 'Unknown Provider') + spec;
+}
+
+// Convert an NPI result (NPI-1 or NPI-2) to the same shape as an OSM element
+function npiToFacility(npi, lat, lon, enumerationType) {
+  var basic    = npi.basic || {};
+  var addr     = (npi.addresses || []).find(function(a){ return a.address_purpose === 'LOCATION'; })
+              || (npi.addresses || [])[0] || {};
+  var taxonomy = (npi.taxonomies || []).find(function(t){ return t.primary; })
+              || (npi.taxonomies || [])[0] || {};
+  var isIndividual = enumerationType === 'NPI-1';
+
+  // For NPI-1: use practice/group name if available, else formatted provider name
+  var displayName = isIndividual
+    ? npi1DisplayName(basic, taxonomy)
+    : (basic.organization_name || basic.name || 'Unknown');
+
+  // For groupBySystem: prefer organization name for affiliation detection
+  var orgName = basic.organization_name || '';
+
+  return {
+    id:   'npi_' + npi.number,
+    type: 'npi',
+    npiType: enumerationType || 'NPI-2',
+    lat:  lat,
+    lon:  lon,
+    tags: {
+      name:              displayName,
+      operator:          orgName,
+      healthcare:        'npi',
+      npi_number:        npi.number,
+      npi_type:          enumerationType || 'NPI-2',
+      npi_taxonomy_code: taxonomy.code || '',
+      npi_taxonomy_desc: taxonomy.desc || '',
+      npi_org:           orgName,
+      address:           addr.address_1 || '',
+      city:              addr.city || '',
+      state:             addr.state || '',
+      postcode:          addr.postal_code || ''
+    }
+  };
+}
+
+// Geocode an NPI address to lat/lon using Nominatim
+// Batched with a small delay to respect rate limits
+async function geocodeAddress(addr, city, state, zip) {
+  var q = [addr, city, state, zip].filter(Boolean).join(', ') + ', USA';
+  try {
+    var url = 'https://nominatim.openstreetmap.org/search?q=' + encodeURIComponent(q) + '&format=json&limit=1&countrycodes=us';
+    var res = await fetch(url, { headers: {'Accept-Language':'en'} });
+    if (!res.ok) return null;
+    var data = await res.json();
+    return data[0] ? { lat: parseFloat(data[0].lat), lon: parseFloat(data[0].lon) } : null;
+  } catch(e) { return null; }
+}
+
+// Main NPI fetch: get facilities for selected types within radius of lat/lon
+async function fetchNPIFacilities(lat, lon, radiusMeters, types) {
+  // NPI Registry blocks browser requests (CORS) from hosted pages.
+  // It only works when running via a local server proxy.
+  // Check if we're in a context where NPI will work.
+  var isLocal = window.location.hostname === 'localhost'
+             || window.location.hostname === '127.0.0.1'
+             || window.location.protocol === 'file:';
+  if (!isLocal) {
+    console.info('NPI skipped — requires local server proxy (not available in hosted mode)');
+    return [];
+  }
+
+  setLoaderMsg('Querying NPI Registry…');
+
+  // Get state abbreviation for NPI query
+  var state = await getStateFromCoords(lat, lon);
+  if (!state) {
+    console.warn('Could not determine state for NPI query — skipping NPI');
+    return [];
+  }
+
+  // Collect unique taxonomy codes for selected types
+  var ALL_TYPES = ['hospital','clinic','ed','outpatient','rehab','urgent_care','specialist'];
+  var selectedTypes = (types && types.length && types.length < ALL_TYPES.length) ? types : ALL_TYPES;
+  var taxCodes = new Set();
+  selectedTypes.forEach(function(t) {
+    (NPI_TAXONOMY[t] || []).forEach(function(code){ taxCodes.add(code); });
+  });
+
+  var codeArr = [...taxCodes];
+
+  // ── NPI-2: Organizations (hospitals, clinics, group practices) ────────────
+  setLoaderMsg('NPI-2 (organizations)…');
+  var npi2Raw = [];
+  for (var i = 0; i < codeArr.length; i += 5) {
+    var batch2 = codeArr.slice(i, i + 5);
+    setLoaderMsg('NPI-2: ' + Math.min(i+5, codeArr.length) + '/' + codeArr.length + '…');
+    var b2Results = await Promise.all(
+      batch2.map(function(code){ return queryNPI(code, state, 'NPI-2', 200); })
+    );
+    b2Results.forEach(function(r){ npi2Raw = npi2Raw.concat(r); });
+    if (i + 5 < codeArr.length) await new Promise(function(r){ setTimeout(r, 200); });
+  }
+
+  // ── NPI-1: Individual practitioners (solo/small specialist offices) ────────
+  // Only query taxonomy codes relevant to specialists and primary care —
+  // not hospitals/facilities since individuals don't run those
+  var npi1Types = ['specialist','clinic','outpatient'];
+  var npi1Codes = new Set();
+  selectedTypes.filter(function(t){ return npi1Types.indexOf(t) >= 0; })
+    .forEach(function(t){ (NPI_TAXONOMY[t] || []).forEach(function(c){ npi1Codes.add(c); }); });
+  var npi1Arr = [...npi1Codes];
+
+  setLoaderMsg('NPI-1 (individual providers)…');
+  var npi1Raw = [];
+  for (var k = 0; k < npi1Arr.length; k += 5) {
+    var batch1 = npi1Arr.slice(k, k + 5);
+    setLoaderMsg('NPI-1: ' + Math.min(k+5, npi1Arr.length) + '/' + npi1Arr.length + '…');
+    var b1Results = await Promise.all(
+      batch1.map(function(code){ return queryNPI(code, state, 'NPI-1', 200); })
+    );
+    b1Results.forEach(function(r){ npi1Raw = npi1Raw.concat(r); });
+    if (k + 5 < npi1Arr.length) await new Promise(function(r){ setTimeout(r, 200); });
+  }
+
+  // ── Deduplicate across both sets by NPI number ────────────────────────────
+  var seen = new Set();
+  // Tag each result with its enumeration type before deduplication
+  var allRaw = npi2Raw.map(function(r){ r._enumType = 'NPI-2'; return r; })
+    .concat(npi1Raw.map(function(r){ r._enumType = 'NPI-1'; return r; }));
+
+  var unique = allRaw.filter(function(r) {
+    if (seen.has(r.number)) return false;
+    seen.add(r.number);
+    return true;
+  });
+
+  console.log('NPI raw: ' + npi2Raw.length + ' orgs (NPI-2) + ' + npi1Raw.length + ' individuals (NPI-1) = ' + unique.length + ' unique');
+
+  // ── Geocode and filter by radius ──────────────────────────────────────────
+  setLoaderMsg('Geocoding NPI results…');
+  var facilities = [];
+  // Prioritise: NPI-2 orgs first (more reliable names), then NPI-1 individuals
+  // Cap at 400 total to keep geocoding time reasonable
+  var npi2Unique = unique.filter(function(r){ return r._enumType === 'NPI-2'; }).slice(0, 250);
+  var npi1Unique = unique.filter(function(r){ return r._enumType === 'NPI-1'; }).slice(0, 150);
+  var toGeocode  = npi2Unique.concat(npi1Unique);
+
+  for (var j = 0; j < toGeocode.length; j += 10) {
+    var gBatch = toGeocode.slice(j, j + 10);
+    setLoaderMsg('Geocoding ' + Math.min(j+10, toGeocode.length) + '/' + toGeocode.length + '…');
+    var gResults = await Promise.all(gBatch.map(function(npi) {
+      var addr = (npi.addresses || []).find(function(a){ return a.address_purpose === 'LOCATION'; })
+              || (npi.addresses || [])[0] || {};
+      return geocodeAddress(addr.address_1, addr.city, addr.state, addr.postal_code)
+        .then(function(coords) {
+          if (!coords) return null;
+          if (haversineMeters(lat, lon, coords.lat, coords.lon) > radiusMeters) return null;
+          return npiToFacility(npi, coords.lat, coords.lon, npi._enumType);
+        });
+    }));
+    gResults.forEach(function(f){ if (f) facilities.push(f); });
+    if (j + 10 < toGeocode.length) await new Promise(function(r){ setTimeout(r, 100); });
+  }
+
+  console.log('NPI: ' + facilities.length + ' geocoded within radius (' +
+    facilities.filter(function(f){ return f.npiType==='NPI-1'; }).length + ' individuals, ' +
+    facilities.filter(function(f){ return f.npiType==='NPI-2'; }).length + ' orgs)');
+  return facilities;
+}
+
+// OSM tag pairs to query per facility type.
+// Tightly scoped — only tags that reliably indicate care-coordination-relevant facilities.
+const FTYPE_TAGS = {
+  hospital:    [ ['amenity','hospital'],
+                 ['healthcare','hospital'] ],
+  clinic:      [ ['amenity','clinic'],
+                 ['amenity','doctors'],
+                 ['healthcare','clinic'],
+                 ['healthcare','doctor'],
+                 ['healthcare','centre'],        // community health centers
+                 ['healthcare','health_centre'] ],  // health centres
+  ed:          [ ['amenity','hospital'],
+                 ['healthcare','emergency'] ],
+  outpatient:  [ ['healthcare','centre'],
+                 ['healthcare','health_centre'],
+                 ['healthcare','outpatient'],
+                 ['amenity','clinic'],
+                 ['amenity','doctors'] ],
+  rehab:       [ ['healthcare','rehabilitation'],
+                 ['amenity','nursing_home'],
+                 ['healthcare','nursing_home'],  // SNFs tagged under healthcare
+                 ['healthcare','hospice'],
+                 ['amenity','clinic'],
+                 ['healthcare','physiotherapist'] ],
+  urgent_care: [ ['amenity','urgent_care'],
+                 ['healthcare','urgent_care'] ],
+  // Specialist offices: OSM tags healthcare=doctor or amenity=doctors
+  // with speciality=* subtag (cardiology, oncology, neurology, etc.)
+  // We query the parent tags and filter by speciality in post-processing
+  specialist:  [ ['healthcare','doctor'],
+                 ['amenity','doctors'],
+                 ['healthcare','centre'],
+                 ['healthcare','health_centre'] ]
+};
+
+// Specialist name/tag patterns — used to identify specialist offices
+// from the broader doctor/clinic results
+const SPECIALIST_TAGS = new Set([
+  'cardiology','oncology','neurology','orthopedics','orthopaedics',
+  'gastroenterology','pulmonology','rheumatology','nephrology','urology',
+  'endocrinology','dermatology','hematology','infectious_disease',
+  'immunology','allergy','surgery','vascular','thoracic','plastic_surgery',
+  'ophthalmology','ent','otolaryngology','pain_management','psychiatry',
+  'obstetrics','gynecology','obgyn','maternal_fetal','neonatology',
+  'pediatrics','geriatrics','sports_medicine','sleep_medicine','radiology',
+  'pathology','anesthesiology','physical_medicine','physiatry'
+]);
+
+const SPECIALIST_NAME_RX = /(cardiol|oncol|neurolog|orthoped|orthopaed|gastro|pulmonol|rheumatol|nephrolog|urolog|endocrinol|hematol|infectious disease|immunol|allerg|vascular|thoracic|plastic surg|ophthalmol|otolaryng|pain management|psychiatr|obstetric|gynecol|ob.?gyn|maternal|neonatol|pediatric|geriatric|sports medicine|sleep medicine|radiolog|patholog|anesthesiol|physiatry|physiatrist|rehabilitation medicine|spine center|spine clinic|cancer center|cancer clinic|heart center|heart clinic|women.?s health|men.?s health|neurosurg|oral surg|hand surg|shoulder|knee clinic|joint replacement|bariatric|fertility|infertility|ivf clinic)/i;
+
+// Hard allowlist — ONLY these amenity/healthcare values are ever kept.
+// Anything without one of these is dropped (blocks building=*, leisure=*, golf=*, etc.)
+const ALLOWED_AMENITY = new Set([
+  'hospital','clinic','doctors','urgent_care','nursing_home'
+]);
+const ALLOWED_HEALTHCARE = new Set([
+  'hospital','clinic','doctor','centre','health_centre','outpatient',
+  'emergency','urgent_care','rehabilitation','hospice','physiotherapist',
+  'specialist'
+]);
+
+// Name patterns that always exclude even if tags look valid
+const REHAB_ALLOW_RX = /\b(rehab(ilitation)?|physical therapy|pt center|sports medicine|orthopaedic|orthopedic|spine center|pain management)\b/i;
+
+const EXCLUDE_NAME_RX = [
+  /\bdent(al|ist|istry)\b/i, /\orthodont/i, /\bendodont/i,
+  /\bpharmac(y|ies|ist)\b/i, /\bdrug\s?store\b/i,
+  /\boptom(etrist|etry)\b/i, /\bophthalmol/i,
+  /\beye\s?(care|clinic|center|centre|doctor|specialist)\b/i,
+  /\bvision\s?(care|center|centre|clinic)\b/i,
+  /\bchiropract(or|ic)\b/i, /\bchiro\b/i,
+  /\bafter.?school\b/i, /\bafter.?care\b/i,
+  /\bchild.?care\b/i, /\bday.?care\b/i,
+  /\bpreschool\b/i, /\bkindergarten\b/i,
+  /\bveterinar(y|ian)\b/i, /\banimal\s+hospital\b/i, /\bpet\s+(clinic|hospital|care)\b/i,
+  /\bgolf\b/i, /\bspa\b/i, /\bsalon\b/i, /\bbeauty\b/i,
+  /\bfitness\b/i, /\bgym\b/i, /\bpilates\b/i, /\byoga\b/i,
+  /\bmassage\b/i, /\bacupuncture\b/i,
+  /\bpodiatr(y|ist)\b/i, /\baudiolog(y|ist)\b/i,
+  /\bhearing\s+(aid|center|clinic)\b/i
+];
+
+// Specialist detection — kept even if other exclude rules would match
+function isSpecialistFacility(facility) {
+  var tags = facility.tags || {};
+  if (tags.speciality && SPECIALIST_TAGS.has(tags.speciality.toLowerCase())) return true;
+  if (tags.specialty  && SPECIALIST_TAGS.has(tags.specialty.toLowerCase()))  return true;
+  if (SPECIALIST_NAME_RX.test(tags.name || '')) return true;
+  return false;
+}
+
+function shouldExclude(facility) {
+  var tags       = facility.tags || {};
+  var amenity    = tags.amenity    || '';
+  var healthcare = tags.healthcare || '';
+  var name       = tags.name       || '';
+
+  // NPI, CMS, Excel, and manually added facilities are pre-vetted — never exclude
+  if (facility.type === 'npi' || facility.type === 'cms' ||
+      facility.type === 'excel' || facility.type === 'manual' ||
+      (facility.id && String(facility.id).startsWith('manual_'))) return false;
+
+  // Specialist offices are always kept regardless of other filters
+  if (isSpecialistFacility(facility)) return false;
+
+  // Must have at least one recognised tag — blocks bare building/leisure/golf nodes
+  if (!ALLOWED_AMENITY.has(amenity) && !ALLOWED_HEALTHCARE.has(healthcare)) return true;
+
+  // Block explicitly bad tag values
+  var badAmenity = ['dentist','pharmacy','optometrist','chiropractor','podiatrist',
+                    'audiologist','beauty','hairdresser','massage','veterinary'];
+  if (badAmenity.indexOf(amenity) >= 0) return true;
+
+  var badHealthcare = ['dentist','dental','pharmacy','optometrist','chiropractor',
+                       'podiatrist','audiologist','psychotherapist',
+                       'psychologist','speech_therapist','acupuncturist','nurse',
+                       'midwife','blood_bank','blood_donation'];
+  // Note: physiotherapist is kept when part of a rehab center context
+  if (badHealthcare.indexOf(healthcare) >= 0) {
+    // Allow physiotherapist if name suggests a rehab/PT center
+    if (healthcare === 'physiotherapist' && REHAB_ALLOW_RX.test(name)) return false;
+    return true;
+  }
+
+  // Block by name keywords
+  for (var i = 0; i < EXCLUDE_NAME_RX.length; i++) {
+    if (EXCLUDE_NAME_RX[i].test(name)) return true;
+  }
+  return false;
+}
+
+// ── CMS Provider of Services ─────────────────────────────
+// Queries the locally-loaded cms_providers.json file
+// No API calls, no rate limits, no CORS issues — pure local lookup
+async function fetchCMSFacilities(lat, lon, radiusMeters, types) {
+  var data = await loadCMSData();
+  if (!data || !data.by_state) return [];
+
+  // Get state(s) to search — include neighboring states for border areas
+  var primaryState = await getStateFromCoords(lat, lon);
+  if (!primaryState) return [];
+
+  // Collect facilities from this state
+  var candidates = data.by_state[primaryState] || [];
+
+  // Also check adjacent states (rough — include all states within ~50 miles)
+  // Simple approach: check all states and filter by distance
+  Object.entries(data.by_state).forEach(function(entry) {
+    if (entry[0] !== primaryState && entry[0] !== 'XX') {
+      // Only scan other states if they have a facility within a reasonable bounding box
+      var sample = entry[1][0];
+      if (sample && haversineMeters(lat, lon, sample.lat, sample.lon) < radiusMeters + 100000) {
+        candidates = candidates.concat(entry[1]);
+      }
+    }
+  });
+
+  // Map our type selections to CMS facility type strings
+  var ALL_TYPES = ['hospital','clinic','ed','outpatient','rehab','urgent_care','specialist'];
+  var selectedTypes = (!types || !types.length || types.length === ALL_TYPES.length) ? ALL_TYPES : types;
+  var typeSet = new Set(selectedTypes);
+
+  // Filter by radius and type
+  var results = [];
+  candidates.forEach(function(f) {
+    if (!f.lat || !f.lon) return;
+    if (haversineMeters(lat, lon, f.lat, f.lon) > radiusMeters) return;
+
+    // Map CMS facility type to our type categories
+    var facType = f.fac_type || 'clinic';
+    // ED is a subset of hospital in CMS
+    if (facType === 'hospital' && typeSet.has('hospital')) {
+      // include
+    } else if (facType === 'hospital' && typeSet.has('ed')) {
+      // include hospitals when ED is selected
+    } else if (!typeSet.has(facType)) {
+      return; // skip types not selected
+    }
+
+    // Convert to our standard facility shape
+    results.push({
+      id:   f.id,
+      type: 'cms',
+      lat:  f.lat,
+      lon:  f.lon,
+      tags: {
+        name:       f.name || 'Unknown',
+        healthcare: 'cms',
+        cms_type:   f.cms_type || '',
+        fac_type:   f.fac_type || '',
+        npi:        f.npi || '',
+        address:    f.addr || '',
+        city:       f.city || '',
+        state:      f.state || '',
+        postcode:   f.zip || ''
+      }
+    });
+  });
+
+  console.log('CMS: ' + results.length + ' facilities within radius from ' + candidates.length + ' state candidates');
+  return results;
+}
+
+// Simple in-memory cache — avoids re-querying on target/display changes
+const facilityCache = {};
+
+function buildOverpassQuery(lat, lon, radius, types) {
+  var ALL_TYPES = ['hospital','clinic','ed','outpatient','rehab','urgent_care','specialist'];
+  var seen = new Set();
+  var clauses = [];
+  var selectedTypes = (!types.length || types.length === ALL_TYPES.length) ? ALL_TYPES : types;
+  selectedTypes.forEach(function(t) {
+    (FTYPE_TAGS[t] || []).forEach(function(pair) {
+      var key = pair[0] + '=' + pair[1];
+      if (!seen.has(key)) {
+        seen.add(key);
+        clauses.push('node["'+pair[0]+'"="'+pair[1]+'"](around:'+radius+','+lat+','+lon+');');
+        clauses.push('way["'+pair[0]+'"="'+pair[1]+'"](around:'+radius+','+lat+','+lon+');');
+      }
+    });
+  });
+  return '[out:json][timeout:30];('+clauses.join('')+');out center tags;';
+}
+
+// Merge two facility arrays, deduplicating by name+proximity.
+// baseFacs is the authoritative set; newFacs are added only if not already present.
+function mergeFacilities(baseFacs, newFacs) {
+  var merged = baseFacs.slice();
+
+  newFacs.forEach(function(nf) {
+    var nfName = (nf.tags && nf.tags.name || '').toLowerCase().trim();
+    // Unnamed facilities are always added — no name to match on
+    if (!nfName) { merged.push(nf); return; }
+
+    var isDupe = baseFacs.some(function(of) {
+      var ofName = (of.tags && of.tags.name || '').toLowerCase().trim();
+      if (!ofName) return false;
+
+      // Use the shorter name's full length as the comparison slice, minimum 6 chars
+      var minLen = Math.min(ofName.length, nfName.length);
+      if (minLen < 6) return false;
+
+      var nameMatch = ofName.includes(nfName.slice(0, minLen)) ||
+                      nfName.includes(ofName.slice(0, minLen));
+      if (!nameMatch) return false;
+
+      var ofLat = of.lat || (of.center && of.center.lat);
+      var ofLon = of.lon || (of.center && of.center.lon);
+      if (!ofLat) return false;
+      return haversineMeters(nf.lat, nf.lon, ofLat, ofLon) < 200;
+    });
+
+    if (!isDupe) merged.push(nf);
+  });
+
+  console.log('mergeFacilities: ' + baseFacs.length + ' base + ' + newFacs.length + ' new = ' + merged.length + ' total (' + (merged.length - baseFacs.length) + ' additions)');
+  return merged;
+}
+
+async function getFacilities(lat, lon, radius, types) {
+  var cacheKey = lat.toFixed(3)+','+lon.toFixed(3)+','+radius+','+[...types].sort().join(',');
+  if (facilityCache[cacheKey]) {
+    setLoaderMsg('Using cached results…');
+    return facilityCache[cacheKey];
+  }
+
+  var npiEnabled = document.getElementById('npiToggle') && document.getElementById('npiToggle').checked;
+  setLoaderMsg(npiEnabled ? 'Fetching from OSM + NPI + CMS…' : 'Fetching from OSM + CMS…');
+
+  var osmPromise = queryOverpass(buildOverpassQuery(lat, lon, radius, types))
+    .then(function(raw) { return raw.filter(function(f){ return !shouldExclude(f); }); })
+    .catch(function(e) { console.warn('OSM failed:', e.message); return []; });
+
+  var npiPromise = npiEnabled
+    ? fetchNPIFacilities(lat, lon, radius, types)
+        .then(function(facs){ return facs.filter(function(f){ return !shouldExclude(f); }); })
+        .catch(function(e){ console.warn('NPI failed:', e.message); return []; })
+    : Promise.resolve([]);
+
+  var cmsPromise = fetchCMSFacilities(lat, lon, radius, types)
+    .catch(function(e){ console.warn('CMS failed:', e.message); return []; });
+
+  var results_arr = await Promise.all([osmPromise, npiPromise, cmsPromise]);
+  var osmFacs = results_arr[0];
+  var npiFacs = results_arr[1];
+  var cmsFacs = results_arr[2];
+
+  var merged = mergeFacilities(osmFacs, npiFacs);
+  merged = mergeFacilities(merged, cmsFacs);
+
+  console.log('OSM: '+osmFacs.length+' | NPI: '+npiFacs.length+' | CMS: '+cmsFacs.length+' | Merged: '+merged.length);
+
+  facilityCache[cacheKey] = merged;
+  return merged;
+}
+
+
+function initMap() {
+  if (mapInstance) return;
+  mapInstance = L.map('map').setView([42.36, -71.05], 10);
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+    attribution: '© <a href="https://www.openstreetmap.org/copyright">OSM</a> © <a href="https://carto.com/">CARTO</a>',
+    subdomains: 'abcd',
+    maxZoom: 19
+  }).addTo(mapInstance);
+  mapInstance.createPane('targetPane');
+  mapInstance.getPane('targetPane').style.zIndex = 650;
+  mapInstance.createPane('defaultPane');
+  mapInstance.getPane('defaultPane').style.zIndex = 400;
+}
+
+// ════════════════════════════════════════════════════════
+//  UI HELPERS
+// ════════════════════════════════════════════════════════
+function showError(msg) {
+  const b = document.getElementById('errorBar');
+  const s = document.getElementById('errorMsg');
+  if (s) s.textContent = msg; else b.textContent = msg;
+  b.classList.add('visible');
+}
+function clearError() { document.getElementById('errorBar').classList.remove('visible'); }
+function setLoaderMsg(msg) {
+  const el = document.getElementById('loaderMsg');
+  if (el) el.textContent = msg;
+}
+
+function switchTab(id) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.querySelector(`.tab[data-tab="${id}"]`).classList.add('active');
+  document.getElementById(id).classList.add('active');
+}
+
+function clearMarkers() {
+  markers.forEach(m => mapInstance.removeLayer(m));
+  markers = [];
+}
+
+// ════════════════════════════════════════════════════════
+//  ICON / PIN CUSTOMISATION
+// ════════════════════════════════════════════════════════
+function handleIconUpload(which, e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    customIcons[which] = ev.target.result;
+    const prev = document.getElementById(which + 'IconPreview');
+    prev.src = ev.target.result;
+    prev.style.display = 'inline-block';
+  };
+  reader.readAsDataURL(file);
+}
+
+function handleLogoUpload(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    ccLogoDataUrl = ev.target.result;
+    try { localStorage.setItem('cpiq_cc_logo', ccLogoDataUrl); } catch(err) {}
+    const prev = document.getElementById('ccLogoPreview');
+    prev.src = ccLogoDataUrl;
+    prev.style.display = 'inline-block';
+  };
+  reader.readAsDataURL(file);
+}
+
+function clearLogo() {
+  ccLogoDataUrl = null;
+  try { localStorage.removeItem('cpiq_cc_logo'); } catch(err) {}
+  document.getElementById('ccLogoUpload').value = '';
+  const prev = document.getElementById('ccLogoPreview');
+  prev.src = '';
+  prev.style.display = 'none';
+}
+
+function clearIcon(which) {
+  customIcons[which] = null;
+  document.getElementById(which + 'IconUpload').value = '';
+  const prev = document.getElementById(which + 'IconPreview');
+  prev.src = '';
+  prev.style.display = 'none';
+}
+
+// ── Drop-pin SVG generator ──────────────────────────────────────────────────
+// Produces a classic Google-Maps-style teardrop pin as an inline SVG data URL.
+// If imgDataUrl is provided, the image is clipped into the pin head circle.
+// size = overall pin height in px; the head is ~60% of height.
+
+// Kept for backward compat with custom image uploads (wraps image in a pin)
+function makeLeafletIcon(dataUrl, size) {
+  // When a user uploads a custom image we still render it inside a pin shape
+  return makePinIcon('#555555', size || 32, dataUrl);
+}
+
+// ════════════════════════════════════════════════════════
+//  DATA FETCHING
+// ════════════════════════════════════════════════════════
+
+// ── Geocoding ────────────────────────────────────────────
+async function getCoords(zip) {
+  const url = 'https://nominatim.openstreetmap.org/search?postalcode=' + encodeURIComponent(zip) + '&country=USA&format=json&limit=1';
+  const res = await fetch(url, { headers: {'Accept-Language':'en'} });
+  if (!res.ok) throw new Error('Geocoding HTTP ' + res.status);
+  const data = await res.json();
+  return data[0] ? { lat: parseFloat(data[0].lat), lon: parseFloat(data[0].lon) } : null;
+}
+
+// ── Overpass (OSM) ───────────────────────────────────────
+
+async function queryOverpass(q) {
+  const body = 'data=' + encodeURIComponent(q);
+  const hdrs = {'Content-Type':'application/x-www-form-urlencoded'};
+  for (var attempt = 1; attempt <= 2; attempt++) {
+    const ctrl = new AbortController();
+    const timer = setTimeout(function(){ ctrl.abort(); }, 45000);
+    try {
+      setLoaderMsg(attempt === 1 ? 'Querying OSM/Overpass…' : 'Retrying Overpass…');
+      const res = await fetch(OVERPASS_URL, {method:'POST', headers:hdrs, body, signal:ctrl.signal});
+      clearTimeout(timer);
+      if (res.status === 429 || res.status === 504) {
+        await new Promise(function(r){ setTimeout(r, 3000); });
+        continue;
+      }
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const json = await res.json();
+      if (!json.elements) throw new Error('Unexpected Overpass response');
+      return json.elements;
+    } catch(e) {
+      clearTimeout(timer);
+      if (e.name === 'AbortError') {
+        if (attempt === 2) throw new Error('Overpass timed out. Try a smaller radius.');
+      } else { throw e; }
+    }
+  }
+  throw new Error('Overpass unavailable.');
+}
+
+// ── NPI Registry ─────────────────────────────────────────
+// Maps facility type selections to NPI taxonomy codes
+// Full taxonomy list: https://nucc.org/index.php/code-sets-mainmenu-41
+
+
+// Convert radius in meters to a reasonable state+zip search strategy
+// NPI API doesn't support radius search — we search by state derived from ZIP geocode
+// and filter results by distance ourselves
+async function getStateFromCoords(lat, lon) {
+  try {
+    const url = 'https://nominatim.openstreetmap.org/reverse?lat=' + lat + '&lon=' + lon + '&format=json&zoom=5';
+    const res = await fetch(url, { headers: {'Accept-Language':'en'} });
+    if (!res.ok) return null;
+    const data = await res.json();
+    return data.address && data.address['ISO3166-2-lvl4']
+      ? data.address['ISO3166-2-lvl4'].replace('US-','')
+      : (data.address && data.address.state_code ? data.address.state_code : null);
+  } catch(e) { return null; }
+}
+
+// Haversine distance in meters
+function haversineMeters(lat1, lon1, lat2, lon2) {
+  const R = 6371000;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a = Math.sin(dLat/2)*Math.sin(dLat/2)
+    + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)
+    * Math.sin(dLon/2)*Math.sin(dLon/2);
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+}
+
+// Query NPI API — supports both NPI-1 (individuals) and NPI-2 (organizations)
+async function queryNPI(taxonomyCode, state, enumerationType, limit) {
+  enumerationType = enumerationType || 'NPI-2';
+  limit = limit || 200;
+  var url = 'https://npiregistry.cms.hhs.gov/api/?version=2.1'
+    + '&taxonomy_description=' + encodeURIComponent(taxonomyCode)
+    + '&state=' + encodeURIComponent(state)
+    + '&limit=' + limit
+    + '&enumeration_type=' + enumerationType;
+  try {
+    var res = await fetch(url);
+    if (!res.ok) return [];
+    var data = await res.json();
+    return data.results || [];
+  } catch(e) { return []; }
+}
+
+// Build a display name for NPI-1 (individual) results
+// Uses practice name if available, otherwise "Dr. Last, First — Specialty"
+function npi1DisplayName(basic, taxonomy) {
+  // Many NPI-1 records have an organization/practice name in authorized_official fields
+  // or in the basic.organization_name (group practice billing under individual NPI)
+  if (basic.organization_name) return basic.organization_name;
+  var last  = basic.last_name  || '';
+  var first = basic.first_name || '';
+  var mid   = basic.middle_name ? ' ' + basic.middle_name : '';
+  var cred  = basic.credential ? ', ' + basic.credential : '';
+  var spec  = taxonomy && taxonomy.desc ? ' — ' + taxonomy.desc : '';
+  return (last ? last + ', ' + first + mid + cred : 'Unknown Provider') + spec;
+}
+
+// Convert an NPI result (NPI-1 or NPI-2) to the same shape as an OSM element
+function npiToFacility(npi, lat, lon, enumerationType) {
+  var basic    = npi.basic || {};
+  var addr     = (npi.addresses || []).find(function(a){ return a.address_purpose === 'LOCATION'; })
+              || (npi.addresses || [])[0] || {};
+  var taxonomy = (npi.taxonomies || []).find(function(t){ return t.primary; })
+              || (npi.taxonomies || [])[0] || {};
+  var isIndividual = enumerationType === 'NPI-1';
+
+  // For NPI-1: use practice/group name if available, else formatted provider name
+  var displayName = isIndividual
+    ? npi1DisplayName(basic, taxonomy)
+    : (basic.organization_name || basic.name || 'Unknown');
+
+  // For groupBySystem: prefer organization name for affiliation detection
+  var orgName = basic.organization_name || '';
+
+  return {
+    id:   'npi_' + npi.number,
+    type: 'npi',
+    npiType: enumerationType || 'NPI-2',
+    lat:  lat,
+    lon:  lon,
+    tags: {
+      name:              displayName,
+      operator:          orgName,
+      healthcare:        'npi',
+      npi_number:        npi.number,
+      npi_type:          enumerationType || 'NPI-2',
+      npi_taxonomy_code: taxonomy.code || '',
+      npi_taxonomy_desc: taxonomy.desc || '',
+      npi_org:           orgName,
+      address:           addr.address_1 || '',
+      city:              addr.city || '',
+      state:             addr.state || '',
+      postcode:          addr.postal_code || ''
+    }
+  };
+}
+
+// Geocode an NPI address to lat/lon using Nominatim
+// Batched with a small delay to respect rate limits
+async function geocodeAddress(addr, city, state, zip) {
+  var q = [addr, city, state, zip].filter(Boolean).join(', ') + ', USA';
+  try {
+    var url = 'https://nominatim.openstreetmap.org/search?q=' + encodeURIComponent(q) + '&format=json&limit=1&countrycodes=us';
+    var res = await fetch(url, { headers: {'Accept-Language':'en'} });
+    if (!res.ok) return null;
+    var data = await res.json();
+    return data[0] ? { lat: parseFloat(data[0].lat), lon: parseFloat(data[0].lon) } : null;
+  } catch(e) { return null; }
+}
+
+// Main NPI fetch: get facilities for selected types within radius of lat/lon
+async function fetchNPIFacilities(lat, lon, radiusMeters, types) {
+  // NPI Registry blocks browser requests (CORS) from hosted pages.
+  // It only works when running via a local server proxy.
+  // Check if we're in a context where NPI will work.
+  var isLocal = window.location.hostname === 'localhost'
+             || window.location.hostname === '127.0.0.1'
+             || window.location.protocol === 'file:';
+  if (!isLocal) {
+    console.info('NPI skipped — requires local server proxy (not available in hosted mode)');
+    return [];
+  }
+
+  setLoaderMsg('Querying NPI Registry…');
+
+  // Get state abbreviation for NPI query
+  var state = await getStateFromCoords(lat, lon);
+  if (!state) {
+    console.warn('Could not determine state for NPI query — skipping NPI');
+    return [];
+  }
+
+  // Collect unique taxonomy codes for selected types
+  var ALL_TYPES = ['hospital','clinic','ed','outpatient','rehab','urgent_care','specialist'];
+  var selectedTypes = (types && types.length && types.length < ALL_TYPES.length) ? types : ALL_TYPES;
+  var taxCodes = new Set();
+  selectedTypes.forEach(function(t) {
+    (NPI_TAXONOMY[t] || []).forEach(function(code){ taxCodes.add(code); });
+  });
+
+  var codeArr = [...taxCodes];
+
+  // ── NPI-2: Organizations (hospitals, clinics, group practices) ────────────
+  setLoaderMsg('NPI-2 (organizations)…');
+  var npi2Raw = [];
+  for (var i = 0; i < codeArr.length; i += 5) {
+    var batch2 = codeArr.slice(i, i + 5);
+    setLoaderMsg('NPI-2: ' + Math.min(i+5, codeArr.length) + '/' + codeArr.length + '…');
+    var b2Results = await Promise.all(
+      batch2.map(function(code){ return queryNPI(code, state, 'NPI-2', 200); })
+    );
+    b2Results.forEach(function(r){ npi2Raw = npi2Raw.concat(r); });
+    if (i + 5 < codeArr.length) await new Promise(function(r){ setTimeout(r, 200); });
+  }
+
+  // ── NPI-1: Individual practitioners (solo/small specialist offices) ────────
+  // Only query taxonomy codes relevant to specialists and primary care —
+  // not hospitals/facilities since individuals don't run those
+  var npi1Types = ['specialist','clinic','outpatient'];
+  var npi1Codes = new Set();
+  selectedTypes.filter(function(t){ return npi1Types.indexOf(t) >= 0; })
+    .forEach(function(t){ (NPI_TAXONOMY[t] || []).forEach(function(c){ npi1Codes.add(c); }); });
+  var npi1Arr = [...npi1Codes];
+
+  setLoaderMsg('NPI-1 (individual providers)…');
+  var npi1Raw = [];
+  for (var k = 0; k < npi1Arr.length; k += 5) {
+    var batch1 = npi1Arr.slice(k, k + 5);
+    setLoaderMsg('NPI-1: ' + Math.min(k+5, npi1Arr.length) + '/' + npi1Arr.length + '…');
+    var b1Results = await Promise.all(
+      batch1.map(function(code){ return queryNPI(code, state, 'NPI-1', 200); })
+    );
+    b1Results.forEach(function(r){ npi1Raw = npi1Raw.concat(r); });
+    if (k + 5 < npi1Arr.length) await new Promise(function(r){ setTimeout(r, 200); });
+  }
+
+  // ── Deduplicate across both sets by NPI number ────────────────────────────
+  var seen = new Set();
+  // Tag each result with its enumeration type before deduplication
+  var allRaw = npi2Raw.map(function(r){ r._enumType = 'NPI-2'; return r; })
+    .concat(npi1Raw.map(function(r){ r._enumType = 'NPI-1'; return r; }));
+
+  var unique = allRaw.filter(function(r) {
+    if (seen.has(r.number)) return false;
+    seen.add(r.number);
+    return true;
+  });
+
+  console.log('NPI raw: ' + npi2Raw.length + ' orgs (NPI-2) + ' + npi1Raw.length + ' individuals (NPI-1) = ' + unique.length + ' unique');
+
+  // ── Geocode and filter by radius ──────────────────────────────────────────
+  setLoaderMsg('Geocoding NPI results…');
+  var facilities = [];
+  // Prioritise: NPI-2 orgs first (more reliable names), then NPI-1 individuals
+  // Cap at 400 total to keep geocoding time reasonable
+  var npi2Unique = unique.filter(function(r){ return r._enumType === 'NPI-2'; }).slice(0, 250);
+  var npi1Unique = unique.filter(function(r){ return r._enumType === 'NPI-1'; }).slice(0, 150);
+  var toGeocode  = npi2Unique.concat(npi1Unique);
+
+  for (var j = 0; j < toGeocode.length; j += 10) {
+    var gBatch = toGeocode.slice(j, j + 10);
+    setLoaderMsg('Geocoding ' + Math.min(j+10, toGeocode.length) + '/' + toGeocode.length + '…');
+    var gResults = await Promise.all(gBatch.map(function(npi) {
+      var addr = (npi.addresses || []).find(function(a){ return a.address_purpose === 'LOCATION'; })
+              || (npi.addresses || [])[0] || {};
+      return geocodeAddress(addr.address_1, addr.city, addr.state, addr.postal_code)
+        .then(function(coords) {
+          if (!coords) return null;
+          if (haversineMeters(lat, lon, coords.lat, coords.lon) > radiusMeters) return null;
+          return npiToFacility(npi, coords.lat, coords.lon, npi._enumType);
+        });
+    }));
+    gResults.forEach(function(f){ if (f) facilities.push(f); });
+    if (j + 10 < toGeocode.length) await new Promise(function(r){ setTimeout(r, 100); });
+  }
+
+  console.log('NPI: ' + facilities.length + ' geocoded within radius (' +
+    facilities.filter(function(f){ return f.npiType==='NPI-1'; }).length + ' individuals, ' +
+    facilities.filter(function(f){ return f.npiType==='NPI-2'; }).length + ' orgs)');
+  return facilities;
+}
+
+// OSM tag pairs to query per facility type.
+// Tightly scoped — only tags that reliably indicate care-coordination-relevant facilities.
+
+
+// Name patterns that always exclude even if tags look valid
+
+
+
+// Specialist detection — kept even if other exclude rules would match
+function isSpecialistFacility(facility) {
+  var tags = facility.tags || {};
+  if (tags.speciality && SPECIALIST_TAGS.has(tags.speciality.toLowerCase())) return true;
+  if (tags.specialty  && SPECIALIST_TAGS.has(tags.specialty.toLowerCase()))  return true;
+  if (SPECIALIST_NAME_RX.test(tags.name || '')) return true;
+  return false;
+}
+
+function shouldExclude(facility) {
+  var tags       = facility.tags || {};
+  var amenity    = tags.amenity    || '';
+  var healthcare = tags.healthcare || '';
+  var name       = tags.name       || '';
+
+  // NPI, CMS, Excel, and manually added facilities are pre-vetted — never exclude
+  if (facility.type === 'npi' || facility.type === 'cms' ||
+      facility.type === 'excel' || facility.type === 'manual' ||
+      (facility.id && String(facility.id).startsWith('manual_'))) return false;
+
+  // Specialist offices are always kept regardless of other filters
+  if (isSpecialistFacility(facility)) return false;
+
+  // Must have at least one recognised tag — blocks bare building/leisure/golf nodes
+  if (!ALLOWED_AMENITY.has(amenity) && !ALLOWED_HEALTHCARE.has(healthcare)) return true;
+
+  // Block explicitly bad tag values
+  var badAmenity = ['dentist','pharmacy','optometrist','chiropractor','podiatrist',
+                    'audiologist','beauty','hairdresser','massage','veterinary'];
+  if (badAmenity.indexOf(amenity) >= 0) return true;
+
+  var badHealthcare = ['dentist','dental','pharmacy','optometrist','chiropractor',
+                       'podiatrist','audiologist','psychotherapist',
+                       'psychologist','speech_therapist','acupuncturist','nurse',
+                       'midwife','blood_bank','blood_donation'];
+  // Note: physiotherapist is kept when part of a rehab center context
+  if (badHealthcare.indexOf(healthcare) >= 0) {
+    // Allow physiotherapist if name suggests a rehab/PT center
+    if (healthcare === 'physiotherapist' && REHAB_ALLOW_RX.test(name)) return false;
+    return true;
+  }
+
+  // Block by name keywords
+  for (var i = 0; i < EXCLUDE_NAME_RX.length; i++) {
+    if (EXCLUDE_NAME_RX[i].test(name)) return true;
+  }
+  return false;
+}
+
+// ── CMS Provider of Services ─────────────────────────────
+// Queries the locally-loaded cms_providers.json file
+// No API calls, no rate limits, no CORS issues — pure local lookup
+async function fetchCMSFacilities(lat, lon, radiusMeters, types) {
+  var data = await loadCMSData();
+  if (!data || !data.by_state) return [];
+
+  // Get state(s) to search — include neighboring states for border areas
+  var primaryState = await getStateFromCoords(lat, lon);
+  if (!primaryState) return [];
+
+  // Collect facilities from this state
+  var candidates = data.by_state[primaryState] || [];
+
+  // Also check adjacent states (rough — include all states within ~50 miles)
+  // Simple approach: check all states and filter by distance
+  Object.entries(data.by_state).forEach(function(entry) {
+    if (entry[0] !== primaryState && entry[0] !== 'XX') {
+      // Only scan other states if they have a facility within a reasonable bounding box
+      var sample = entry[1][0];
+      if (sample && haversineMeters(lat, lon, sample.lat, sample.lon) < radiusMeters + 100000) {
+        candidates = candidates.concat(entry[1]);
+      }
+    }
+  });
+
+  // Map our type selections to CMS facility type strings
+  var ALL_TYPES = ['hospital','clinic','ed','outpatient','rehab','urgent_care','specialist'];
+  var selectedTypes = (!types || !types.length || types.length === ALL_TYPES.length) ? ALL_TYPES : types;
+  var typeSet = new Set(selectedTypes);
+
+  // Filter by radius and type
+  var results = [];
+  candidates.forEach(function(f) {
+    if (!f.lat || !f.lon) return;
+    if (haversineMeters(lat, lon, f.lat, f.lon) > radiusMeters) return;
+
+    // Map CMS facility type to our type categories
+    var facType = f.fac_type || 'clinic';
+    // ED is a subset of hospital in CMS
+    if (facType === 'hospital' && typeSet.has('hospital')) {
+      // include
+    } else if (facType === 'hospital' && typeSet.has('ed')) {
+      // include hospitals when ED is selected
+    } else if (!typeSet.has(facType)) {
+      return; // skip types not selected
+    }
+
+    // Convert to our standard facility shape
+    results.push({
+      id:   f.id,
+      type: 'cms',
+      lat:  f.lat,
+      lon:  f.lon,
+      tags: {
+        name:       f.name || 'Unknown',
+        healthcare: 'cms',
+        cms_type:   f.cms_type || '',
+        fac_type:   f.fac_type || '',
+        npi:        f.npi || '',
+        address:    f.addr || '',
+        city:       f.city || '',
+        state:      f.state || '',
+        postcode:   f.zip || ''
+      }
+    });
+  });
+
+  console.log('CMS: ' + results.length + ' facilities within radius from ' + candidates.length + ' state candidates');
+  return results;
+}
+
+// Simple in-memory cache — avoids re-querying on target/display changes
+function buildOverpassQuery(lat, lon, radius, types) {
+  var ALL_TYPES = ['hospital','clinic','ed','outpatient','rehab','urgent_care','specialist'];
+  var seen = new Set();
+  var clauses = [];
+  var selectedTypes = (!types.length || types.length === ALL_TYPES.length) ? ALL_TYPES : types;
+  selectedTypes.forEach(function(t) {
+    (FTYPE_TAGS[t] || []).forEach(function(pair) {
+      var key = pair[0] + '=' + pair[1];
+      if (!seen.has(key)) {
+        seen.add(key);
+        clauses.push('node["'+pair[0]+'"="'+pair[1]+'"](around:'+radius+','+lat+','+lon+');');
+        clauses.push('way["'+pair[0]+'"="'+pair[1]+'"](around:'+radius+','+lat+','+lon+');');
+      }
+    });
+  });
+  return '[out:json][timeout:30];('+clauses.join('')+');out center tags;';
+}
+
+// Merge two facility arrays, deduplicating by name+proximity.
+// baseFacs is the authoritative set; newFacs are added only if not already present.
+function mergeFacilities(baseFacs, newFacs) {
+  var merged = baseFacs.slice();
+
+  newFacs.forEach(function(nf) {
+    var nfName = (nf.tags && nf.tags.name || '').toLowerCase().trim();
+    // Unnamed facilities are always added — no name to match on
+    if (!nfName) { merged.push(nf); return; }
+
+    var isDupe = baseFacs.some(function(of) {
+      var ofName = (of.tags && of.tags.name || '').toLowerCase().trim();
+      if (!ofName) return false;
+
+      // Use the shorter name's full length as the comparison slice, minimum 6 chars
+      var minLen = Math.min(ofName.length, nfName.length);
+      if (minLen < 6) return false;
+
+      var nameMatch = ofName.includes(nfName.slice(0, minLen)) ||
+                      nfName.includes(ofName.slice(0, minLen));
+      if (!nameMatch) return false;
+
+      var ofLat = of.lat || (of.center && of.center.lat);
+      var ofLon = of.lon || (of.center && of.center.lon);
+      if (!ofLat) return false;
+      return haversineMeters(nf.lat, nf.lon, ofLat, ofLon) < 200;
+    });
+
+    if (!isDupe) merged.push(nf);
+  });
+
+  console.log('mergeFacilities: ' + baseFacs.length + ' base + ' + newFacs.length + ' new = ' + merged.length + ' total (' + (merged.length - baseFacs.length) + ' additions)');
+  return merged;
+}
+
+async function getFacilities(lat, lon, radius, types) {
+  var cacheKey = lat.toFixed(3)+','+lon.toFixed(3)+','+radius+','+[...types].sort().join(',');
+  if (facilityCache[cacheKey]) {
+    setLoaderMsg('Using cached results…');
+    return facilityCache[cacheKey];
+  }
+
+  // Run OSM and NPI queries in parallel
+  var npiOn = document.getElementById('npiToggle') && document.getElementById('npiToggle').checked;
+  var isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+  var npiActive = npiOn && isLocal;
+  setLoaderMsg(npiActive ? 'Fetching from OSM + NPI + CMS…' : 'Fetching from OSM + CMS + Embedded…');
+  var osmPromise = queryOverpass(buildOverpassQuery(lat, lon, radius, types))
+    .then(function(raw) {
+      return raw.filter(function(f){ return !shouldExclude(f); });
+    })
+    .catch(function(e) {
+      console.warn('OSM query failed:', e.message);
+      return [];
+    });
+
+  var npiEnabled = document.getElementById('npiToggle') && document.getElementById('npiToggle').checked;
+  var npiPromise = npiEnabled
+    ? fetchNPIFacilities(lat, lon, radius, types).catch(function(e) {
+        console.warn('NPI query failed:', e.message);
+        return [];
+      })
+    : Promise.resolve([]);
+
+  var results_arr = await Promise.all([osmPromise, npiPromise]);
+  var osmFacs = results_arr[0];
+  var npiFacs = results_arr[1];
+
+  // Filter NPI results through shouldExclude too
+  npiFacs = npiFacs.filter(function(f){ return !shouldExclude(f); });
+
+  var results = mergeFacilities(osmFacs, npiFacs);
+  console.log('OSM: '+osmFacs.length+' | NPI: '+npiFacs.length+' | Merged: '+results.length);
+
+  facilityCache[cacheKey] = results;
+  return results;
+}
+
+// ════════════════════════════════════════════════════════
+//  SYSTEM CLASSIFICATION
+// ════════════════════════════════════════════════════════
+
+// Well-known system aliases used as a FALLBACK for competitor grouping only.
+// The target is always matched dynamically from what the user typed.
+const KNOWN_SYSTEMS = [
+  // ── New England (expanded affiliate lists) ───────────────────────────────
+  { name: 'Mass General Brigham', patterns: [
+    'mass general','massachusetts general',
+    'brigham and women','brigham & women','brigham hospital',
+    'mgh ','mgh-','faulkner hospital','faulkner hospital',
+    'cooley dickinson','newton-wellesley','newton wellesley',
+    'north shore medical','salem hospital','union hospital','union campus',
+    'wentworth-douglass','wentworth douglass',
+    'martha vineyard hospital','nantucket cottage',
+    'ipswich hospital','emerson hospital',
+    'spaulding rehab','spaulding rehabilitation',
+    'mclean hospital','mcclean hospital',
+    'brigham and women faulkner',
+    'mass eye and ear','massachusetts eye and ear',
+    'cape cod hospital','cape cod healthcare',
+    'island hospital'
+  ]},
+  { name: 'Beth Israel Lahey', patterns: [
+    'beth israel deaconess','bidmc','beth israel medical',
+    'lahey hospital','lahey clinic','lahey health',
+    'deaconess hospital','new england deaconess',
+    'mount auburn hospital','mount auburn',
+    'new england baptist','ne baptist',
+    'beverly hospital','addison gilbert',
+    'anna jaques hospital','anna jaques',
+    'winchester hospital','winchester campus',
+    'choate health','cambridge health alliance',
+    'nantucket cottage hospital','bmc health','brockton',
+    'atlantic medical group','lahey burlington',
+    'nash hua hospital','southern new hampshire',
+    'Northeast hospital','northeast health system'
+  ]},
+  { name: 'Tufts Medicine', patterns: [
+    'tufts medical','tufts medicine','tufts campus',
+    'new england medical center','nemc',
+    'lowell general hospital','lowell general',
+    'melrosewakefield hospital','melrose wakefield',
+    'lawrence memorial hospital','lawrence mem',
+    'circle health','circle medical group',
+    'saints campus','tufts children',
+    'floating hospital','tufts shared services',
+    'nashoba valley medical','nashoba valley'
+  ]},
+  { name: 'UMass Memorial', patterns: [
+    'umass memorial','u mass memorial','university of massachusetts',
+    'umass medical','umass hospital',
+    'umass memorial medical center',
+    'clinton hospital','health alliance',
+    'marlborough hospital','marlborough campus',
+    'wing memorial','wing hospital',
+    'umass cardiology','umass cancer'
+  ]},
+  { name: 'Steward Health Care', patterns: [
+    'steward','carney hospital','carney campus',
+    'good samaritan medical','good samaritan needham',
+    'holy family hospital','holy family haverhill',
+    'morton hospital','morton taunton',
+    'norwood hospital','norwood campus',
+    'saint anne hospital','st. anne',
+    'st elizabeth medical','saint elizabeth',
+    'nashville general steward'
+  ]},
+  { name: 'Yale New Haven Health', patterns: [
+    'yale new haven','yale-new haven','ynhh',
+    'yale university hospital','yale medical',
+    'bridgeport hospital','greenwich hospital',
+    'lawrence + memorial','lawrence memorial new london',
+    'westerly hospital','northeast medical group',
+    'smilow cancer','yale smilow'
+  ]},
+  { name: 'Hartford HealthCare', patterns: [
+    'hartford hospital','hartford healthcare','hartford health',
+    'backus hospital','backus',
+    'charlotte hungerford','charlotte hungerford',
+    'midstate medical','midstate',
+    'natchaug hospital','natchaug',
+    'windham hospital','windham',
+    'jefferson radiology','medical group of eastern connecticut',
+    'the hospital of central connecticut','central connecticut',
+    'new britain general'
+  ]},
+  { name: 'Care New England', patterns: [
+    'care new england','women and infants','women & infants',
+    'kent hospital','kent county',
+    'butler hospital','butler psychiatric',
+    'vna of care new england'
+  ]},
+  { name: 'Lifespan', patterns: [
+    'lifespan','rhode island hospital','hasbro children',
+    'miriam hospital','the miriam',
+    'newport hospital','newport health',
+    'bradley hospital','emma pendleton'
+  ]},
+  { name: 'MaineHealth', patterns: [
+    'mainehealth','maine health','maine medical center',
+    'maine med','spring harbor hospital',
+    'southern maine health','southern maine medical',
+    'mid coast hospital','mid coast health',
+    'pen bay medical','pen bay',
+    'waldo county general','waldo county',
+    'lincoln health','miles campus',
+    'st. mary regional','st mary regional',
+    'franklin memorial hospital','franklin memorial maine'
+  ]},
+  { name: 'Dartmouth Health', patterns: [
+    'dartmouth','mary hitchcock','dartmouth-hitchcock',
+    'dartmouth hitchcock','dhmc',
+    'alice peck day','alice peck',
+    'mt. ascutney','mount ascutney',
+    'cheshire medical','cheshire hospital',
+    'weeks medical','weeks hospital',
+    'new london hospital','new london nh',
+    'cottage hospital nh'
+  ]},
+  // ── National systems ─────────────────────────────────────────────────────
+  { name: 'HCA Healthcare',         patterns: ['hca healthcare','hca hospital','columbia/hca','hca affiliated'] },
+  { name: 'Trinity Health',         patterns: ['trinity health','mercy health','saint joseph mercy','mercy medical center','mount mercy','saint mary mercy'] },
+  { name: 'Ascension',              patterns: ['ascension','providence health ministries','columbia st. mary','wheaton franciscan'] },
+  { name: 'CommonSpirit Health',    patterns: ['commonspirit','common spirit','dignity health','chichme','franciscan health','dominican hospital'] },
+  { name: 'Advocate Aurora',        patterns: ['advocate aurora','advocate health','aurora health','advocate christ','advocate good samaritan','advocate illinois masonic'] },
+  { name: 'Providence',             patterns: ['providence health','providence st','providence regional','providence portland'] },
+  { name: 'Northwell Health',       patterns: ['northwell','lenox hill','long island jewish','north shore university hospital','south shore hospital ny','plainview hospital','syosset hospital','huntington hospital ny','phelps hospital','glen cove hospital'] },
+  { name: 'NYU Langone',            patterns: ['nyu langone','nyu hospital','nyu medical','bellevue hospital','tisch hospital','manhattan eye ear throat'] },
+  { name: 'NewYork-Presbyterian',   patterns: ['newyork-presbyterian','new york presbyterian','nyp ','columbia university medical','weill cornell','morgan stanley children'] },
+  { name: 'Mount Sinai',            patterns: ['mount sinai','icahn school','mount sinai beth israel','mount sinai west','mount sinai morningside','new york eye and ear'] },
+  { name: 'Memorial Sloan Kettering', patterns: ['memorial sloan','msk ','sloan kettering'] },
+  { name: 'Cleveland Clinic',       patterns: ['cleveland clinic','marymount hospital oh','hillcrest hospital oh','fairview hospital oh','lutheran hospital oh','medina hospital oh'] },
+  { name: 'Mayo Clinic',            patterns: ['mayo clinic','mayo medical','mayo rochester','mayo health system','mayo hospital'] },
+  { name: 'Kaiser Permanente',      patterns: ['kaiser permanente','kaiser foundation','kaiser hospital','kaiser medical center'] },
+  { name: 'Sutter Health',          patterns: ['sutter health','sutter medical','sutter memorial','mills-peninsula','alta bates','california pacific medical','cpmc'] },
+  { name: 'Intermountain Health',   patterns: ['intermountain','lds hospital','primary childrens','utah valley hospital','mckay-dee'] },
+  { name: 'Banner Health',          patterns: ['banner health','banner hospital','banner medical center','banner university'] },
+  { name: 'AdventHealth',           patterns: ['adventhealth','advent health','florida hospital','shawnee mission medical','parker adventist'] },
+  { name: 'Atrium Health',          patterns: ['atrium health','carolinas medical','mercy atrium','navicent health','wake forest baptist','wake forest medical'] },
+  { name: 'Prisma Health',          patterns: ['prisma','palmetto health','greenville memorial','greenville health'] },
+  { name: 'OhioHealth',             patterns: ['ohiohealth','ohio health','riverside methodist','grant medical center','doctors hospital oh','grady memorial oh'] },
+  { name: 'University Hospitals',   patterns: ['university hospitals','uh medical','uh geauga','uh portage','uh elyria'] },
+  { name: 'Penn Medicine',          patterns: ['penn medicine','upenn health','university of pennsylvania health','penn presbyterian','pennsylvania hospital','chester county hospital','lancaster general'] },
+  { name: 'Jefferson Health',       patterns: ['jefferson health','thomas jefferson university','jefferson hospital','abington hospital','nemours'] },
+  { name: 'ChristianaCare',         patterns: ['christianacare','christiana care','christiana hospital','wilmington hospital de'] },
+  { name: 'Spectrum Health',        patterns: ['spectrum health','corewell','blodgett campus','butterworth campus','helen devos'] },
+  { name: 'Henry Ford Health',      patterns: ['henry ford','henry ford hospital','henry ford macomb','henry ford wyandotte','henry ford west bloomfield'] },
+  { name: 'Beaumont Health',        patterns: ['beaumont health','beaumont hospital','william beaumont'] },
+  { name: 'OSF HealthCare',         patterns: ['osf healthcare','osf health','osf saint francis','osf saint anthony'] },
+  { name: 'SSM Health',             patterns: ['ssm health','ssm st. mary','ssm depaul','ssm st. francis','ssm st. clare'] },
+  { name: 'BJC HealthCare',         patterns: ['bjc','barnes-jewish','christian hospital','missouri baptist','alton memorial'] },
+  { name: 'Sanford Health',         patterns: ['sanford health','sanford hospital','sanford medical','sanford bismarck','sanford fargo'] },
+  { name: 'Fairview Health',        patterns: ['fairview health','fairview hospital','university of minnesota medical center','fairview ridges'] },
+  { name: 'Allina Health',          patterns: ['allina health','abbott northwestern','united hospital mn','mercy hospital mn','river falls medical'] },
+  { name: 'HealthPartners',         patterns: ['healthpartners','health partners','regions hospital','methodist hospital mn','lakeview hospital mn'] },
+  { name: 'UCHealth',               patterns: ['uchealth','uc health','university of colorado hospital','memorial hospital colorado','poudre valley'] },
+  { name: 'Centura Health',         patterns: ['centura','porter adventist','st. francis hospital co','penrose hospital','parker adventist','avista adventist'] },
+  { name: 'Scripps Health',         patterns: ['scripps health','scripps memorial','scripps green','scripps mercy','scripps encinitas'] },
+  { name: 'Sharp HealthCare',       patterns: ['sharp healthcare','sharp memorial','sharp grossmont','sharp chula vista','sharp coronado'] },
+  { name: 'Cedars-Sinai',           patterns: ['cedars-sinai','cedars sinai','marina del rey hospital cs'] },
+  { name: 'UCLA Health',            patterns: ['ucla health','ronald reagan ucla','ucla medical center','mattel children'] },
+  { name: 'UCSF Health',            patterns: ['ucsf','zuckerberg san francisco general','ucsf benioff','moffitt hospital ucsf'] },
+  { name: 'Stanford Health',        patterns: ['stanford health','stanford hospital','stanford medical center','lucile packard'] },
+  { name: 'Vanderbilt Health',      patterns: ['vanderbilt','vumc','vanderbilt university medical','vanderbilt wilson county'] },
+  { name: 'Emory Healthcare',       patterns: ['emory','emory university hospital','emory saint joseph','emory johns creek','emory decatur'] },
+  { name: 'Piedmont Healthcare',    patterns: ['piedmont healthcare','piedmont hospital','piedmont atlanta','piedmont newton','piedmont henry'] },
+  { name: 'WellStar Health',        patterns: ['wellstar','wellstar kennestone','wellstar cobb','wellstar douglas','wellstar paulding'] },
+  { name: 'Ochsner Health',         patterns: ['ochsner','ochsner medical center','ochsner baptist','ochsner st. anne'] },
+  { name: 'LCMC Health',            patterns: ['lcmc','childrens hospital new orleans','university medical center new orleans','touro infirmary','west jefferson medical'] },
+  { name: 'CHRISTUS Health',        patterns: ['christus','christus mother frances','christus santa rosa','christus trinity mother frances'] },
+  { name: 'Baylor Scott & White',   patterns: ['baylor scott','baylor white','baylor university medical','scott & white','scott and white'] },
+  { name: 'Texas Health Resources', patterns: ['texas health resources','texas health harris','texas health presbyterian'] },
+  { name: 'Memorial Hermann',       patterns: ['memorial hermann','memorial herman','memorial city medical'] },
+  { name: 'Houston Methodist',      patterns: ['houston methodist','methodist hospital houston','houston methodist sugar land'] },
+  { name: 'MD Anderson',            patterns: ['md anderson','anderson cancer','university of texas md anderson'] },
+  { name: 'Baptist Health',         patterns: ['baptist health','baptist hospital','baptist medical center'] },
+  { name: 'Encompass Health',       patterns: ['encompass health','encompass rehabilitation','healthsouth'] },
+  { name: 'LifePoint Health',       patterns: ['lifepoint','lifepoint hospital'] },
+  { name: 'Community Health Systems', patterns: ['community health systems','chs hospital','chs medical center'] },
+  { name: 'Tenet Healthcare',       patterns: ['tenet','detroit medical center','hahnemann university hospital','palm beach gardens medical'] },
+  { name: 'Universal Health',       patterns: ['universal health services','uhs hospital','universal health','behavioral health uhs'] },
+  { name: 'Ascension',              patterns: ['ascension'] },
+  { name: 'CommonSpirit Health',    patterns: ['commonspirit','common spirit','dignity health','chichme'] },
+  { name: 'Advocate Aurora',        patterns: ['advocate aurora','advocate health','aurora health'] },
+  { name: 'Providence',             patterns: ['providence health','providence st'] },
+  { name: 'Northwell Health',       patterns: ['northwell'] },
+  { name: 'NYU Langone',            patterns: ['nyu langone','nyu hospital'] },
+  { name: 'NewYork-Presbyterian',   patterns: ['newyork-presbyterian','new york presbyterian','nyp '] },
+  { name: 'Mount Sinai',            patterns: ['mount sinai','icahn'] },
+  { name: 'Memorial Sloan Kettering', patterns: ['memorial sloan','msk ','sloan kettering'] },
+  { name: 'Cleveland Clinic',       patterns: ['cleveland clinic'] },
+  { name: 'Mayo Clinic',            patterns: ['mayo clinic'] },
+  { name: 'Kaiser Permanente',      patterns: ['kaiser'] },
+  { name: 'Sutter Health',          patterns: ['sutter'] },
+  { name: 'Intermountain Health',   patterns: ['intermountain'] },
+  { name: 'Banner Health',          patterns: ['banner health','banner hospital'] },
+  { name: 'AdventHealth',           patterns: ['adventhealth','advent health','florida hospital'] },
+  { name: 'Atrium Health',          patterns: ['atrium health','carolinas medical'] },
+  { name: 'Prisma Health',          patterns: ['prisma'] },
+  { name: 'OhioHealth',             patterns: ['ohiohealth','ohio health'] },
+  { name: 'University Hospitals',   patterns: ['university hospitals'] },
+  { name: 'Penn Medicine',          patterns: ['penn medicine','university of pennsylvania health'] },
+  { name: 'Jefferson Health',       patterns: ['jefferson health','thomas jefferson'] },
+  { name: 'MaineHealth',            patterns: ['mainehealth','maine health','maine medical'] },
+  { name: 'Dartmouth Health',       patterns: ['dartmouth','mary hitchcock'] },
+  { name: 'ChristianaCare',         patterns: ['christianacare','christiana care'] },
+  { name: 'Spectrum Health',        patterns: ['spectrum health','corewell'] },
+  { name: 'Henry Ford Health',      patterns: ['henry ford'] },
+  { name: 'Beaumont Health',        patterns: ['beaumont'] },
+  { name: 'OSF HealthCare',         patterns: ['osf healthcare','osf health'] },
+  { name: 'SSM Health',             patterns: ['ssm health'] },
+  { name: 'BJC HealthCare',         patterns: ['bjc'] },
+  { name: 'Barnes-Jewish',          patterns: ['barnes-jewish','barnes jewish'] },
+  { name: 'Sanford Health',         patterns: ['sanford health'] },
+  { name: 'Fairview Health',        patterns: ['fairview'] },
+  { name: 'Allina Health',          patterns: ['allina'] },
+  { name: 'HealthPartners',         patterns: ['healthpartners','health partners'] },
+  { name: 'UCHealth',               patterns: ['uchealth','uc health'] },
+  { name: 'SCL Health',             patterns: ['scl health'] },
+  { name: 'Centura Health',         patterns: ['centura'] },
+  { name: 'Scripps Health',         patterns: ['scripps'] },
+  { name: 'Sharp HealthCare',       patterns: ['sharp healthcare','sharp hospital'] },
+  { name: 'Dignity Health',         patterns: ['dignity health'] },
+  { name: 'Cedars-Sinai',           patterns: ['cedars-sinai','cedars sinai'] },
+  { name: 'UCLA Health',            patterns: ['ucla health','ronald reagan ucla'] },
+  { name: 'UCSF Health',            patterns: ['ucsf'] },
+  { name: 'Stanford Health',        patterns: ['stanford health','stanford hospital'] },
+  { name: 'Vanderbilt Health',      patterns: ['vanderbilt'] },
+  { name: 'Emory Healthcare',       patterns: ['emory'] },
+  { name: 'Piedmont Healthcare',    patterns: ['piedmont healthcare'] },
+  { name: 'WellStar Health',        patterns: ['wellstar'] },
+  { name: 'Ochsner Health',         patterns: ['ochsner'] },
+  { name: 'LCMC Health',            patterns: ['lcmc'] },
+  { name: 'CHRISTUS Health',        patterns: ['christus'] },
+  { name: 'Baylor Scott & White',   patterns: ['baylor scott','baylor white'] },
+  { name: 'Texas Health Resources', patterns: ['texas health resources'] },
+  { name: 'Methodist Health',       patterns: ['methodist health system','methodist dallas','methodist mansfield','methodist midlothian','methodist charlton','methodist southlake'] },
+  { name: 'Memorial Hermann',       patterns: ['memorial hermann','memorialhermann'] },
+  { name: 'Houston Methodist',      patterns: ['houston methodist','methodist hospital houston','houston methodist sugar land','houston methodist west','houston methodist willowbrook','houston methodist baytown','houston methodist clear lake','houston methodist the woodlands','houston methodist san jacinto'] },
+  { name: 'MD Anderson',            patterns: ['md anderson','anderson cancer'] },
+  { name: 'Baptist Health',         patterns: ['baptist health'] },
+  { name: 'Encompass Health',       patterns: ['encompass'] },
+  { name: 'LifePoint Health',       patterns: ['lifepoint'] },
+  { name: 'Community Health Systems', patterns: ['community health systems','chs hospital'] },
+  { name: 'Tenet Healthcare',       patterns: ['tenet'] },
+  { name: 'Universal Health',       patterns: ['universal health','uhs '] },
+];
+
+// Build search tokens from a typed name — splits on spaces, dashes, common words
+function tokenize(str) {
+  // Only strip pure connector words — keep substantive words like 'health',
+  // 'methodist', 'memorial' etc. that distinguish one system from another.
+  var stopwords = new Set(['the','and','for','of','at','in','by','to','a','an']);
+  return str.toLowerCase()
+    .replace(/[^a-z0-9 ]/g, ' ')
+    .split(/\s+/)
+    .filter(function(w){ return w.length > 1 && !stopwords.has(w); });
+}
+
+// Score how well a facility name matches the typed target (0 = no match)
+function matchScore(facilityName, targetTokens) {
+  if (!facilityName) return 0;
+  const fn = facilityName.toLowerCase();
+  let score = 0;
+  targetTokens.forEach(function(tok) {
+    if (fn.includes(tok)) score++;
+  });
+  return score;
+}
+
+function groupBySystem(facilities, targetInput) {
+  const systems = {};
+  const targetTokens = tokenize(targetInput);
+  const targetLower  = targetInput.toLowerCase();
+  // Pre-compute target domain if user typed a known system name
+  var targetDomain = null;
+  if (typeof DOMAIN_SYSTEM_MAP !== 'undefined') {
+    Object.entries(DOMAIN_SYSTEM_MAP).forEach(function(entry) {
+      if (entry[1].toLowerCase() === targetLower ||
+          entry[1].toLowerCase().includes(targetLower) ||
+          targetLower.includes(entry[1].toLowerCase().split(' ')[0])) {
+        targetDomain = entry[0];
+      }
+    });
+  }
+
+  facilities.forEach(function(h) {
+    var rawName = h.tags && h.tags.name ? h.tags.name : 'Unknown';
+    var npiOrg  = h.tags && h.tags.npi_org ? h.tags.npi_org : '';
+    const name    = (npiOrg.length > rawName.length) ? npiOrg : rawName;
+    const nameLow = name.toLowerCase();
+    let bucket    = null;
+
+    // ── Step 0: Use authoritative domain attribution from embedded data ──────
+    // This is the most reliable signal — the endpoint domain identifies
+    // exactly which EHR instance (= health system) the facility belongs to.
+    var facDomain = h.dom || (h.tags && h.tags.dom) || '';
+    var facSys    = h._embeddedSystem || (h.tags && h.tags._embeddedSystem) || '';
+
+    if (!bucket && facDomain && typeof DOMAIN_SYSTEM_MAP !== 'undefined') {
+      var mappedSys = DOMAIN_SYSTEM_MAP[facDomain];
+      if (mappedSys) {
+        // Check if this domain matches the target
+        if (facDomain === targetDomain ||
+            (targetTokens.length > 0 && matchScore(mappedSys, targetTokens) === targetTokens.length)) {
+          bucket = targetInput;
+        } else {
+          bucket = mappedSys;
+        }
+      }
+    }
+
+    // Use pre-assigned system from embedded data if available
+    if (!bucket && facSys) {
+      if (targetTokens.length > 0 && matchScore(facSys, targetTokens) === targetTokens.length) {
+        bucket = targetInput;
+      } else {
+        bucket = facSys;
+      }
+    }
+
+    // ── Step 1: Match against the typed target by name (fallback for OSM/NPI)
+    if (!bucket && targetTokens.length > 0 &&
+        matchScore(name, targetTokens) === targetTokens.length) {
+      bucket = targetInput;
+    }
+
+    // ── Step 2: Match against known parent health system names
+    if (!bucket) {
+      for (var i = 0; i < KNOWN_SYSTEMS.length; i++) {
+        var sys = KNOWN_SYSTEMS[i];
+        // Skip if this system matches the typed target (avoid double-claiming)
+        if (sys.name.toLowerCase() === targetLower ||
+            targetTokens.some(function(t){ return sys.name.toLowerCase().includes(t); })) continue;
+        for (var j = 0; j < sys.patterns.length; j++) {
+          var pat = sys.patterns[j];
+          // Use word-boundary check: pattern must appear as a whole phrase,
+          // not as a fragment inside another word
+          var patRx = new RegExp('(?:^|[\\s\\-,\\/])' + pat.replace(/[.*+?^${}()|[\]\\]/g,'\\$&') + '(?:[\\s\\-,\\/]|$)');
+          if (patRx.test(nameLow)) {
+            bucket = sys.name;
+            break;
+          }
+        }
+        if (bucket) break;
+      }
+    }
+
+    // ── Step 3: Anything unrecognized → "Independent / Community"
+    // No keyword-fragment bucketing — keeps the legend and insights clean.
+    if (!bucket) {
+      bucket = 'Independent / Community';
+    }
+
+    if (!systems[bucket]) systems[bucket] = [];
+    systems[bucket].push(h);
+  });
+
+  return systems;
+}
+
+// ════════════════════════════════════════════════════════
+//  COLOUR / LEGEND
+// ════════════════════════════════════════════════════════
+function resetColors() {
+  Object.keys(colorMap).forEach(k => delete colorMap[k]);
+  colorIdx = 0;
+}
+
+function getColor(sys, targetKey) {
+  if (sys === targetKey) return document.getElementById('targetColor').value;
+  if (sys === 'Independent / Community') return document.getElementById('independentColor').value;
+  // Each named competitor system gets its own unique color from the palette
+  if (!colorMap[sys]) {
+    while (SYSTEM_COLORS[colorIdx % SYSTEM_COLORS.length] ===
+           document.getElementById('targetColor').value) { colorIdx++; }
+    colorMap[sys] = SYSTEM_COLORS[colorIdx % SYSTEM_COLORS.length];
+    colorIdx++;
+  }
+  return colorMap[sys];
+}
+
+function buildLegend(systems, targetKey) {
+  const el = document.getElementById('legItems');
+  // Always show target first, then top 4 competitors by count
+  const sorted = Object.entries(systems).sort((a,b) => b[1].length - a[1].length);
+  const target  = sorted.filter(([s]) => s === targetKey);
+  const others  = sorted.filter(([s]) => s !== targetKey).slice(0, 4);
+  const display = [...target, ...others];
+  const total   = Object.keys(systems).length;
+
+  el.innerHTML = display.map(([sys]) => {
+    const c = getColor(sys, targetKey);
+    const isT = sys === targetKey;
+    const label = isT ? '<strong>' + sys + '</strong>' : sys;
+    // Mini teardrop SVG for legend
+    const ps = isT ? 18 : 14;
+    const pw = Math.round(ps * 0.72);
+    const pr = Math.round(pw / 2);
+    const tailY = ps - 1;
+    const cp1x = pr - pr*0.45, cp1y = pr + pr*0.85;
+    const cp2x = pr + pr*0.45, cp2y = pr + pr*0.85;
+    const path = 'M '+pr+' '+tailY+' C '+cp1x+' '+cp1y+' 0 '+(pr+pr*0.4)+' 0 '+pr+' A '+pr+' '+pr+' 0 1 1 '+pw+' '+pr+' C '+pw+' '+(pr+pr*0.4)+' '+cp2x+' '+cp2y+' '+pr+' '+tailY+' Z';
+    const dot = '<svg width="'+pw+'" height="'+ps+'" viewBox="0 0 '+pw+' '+ps+'" style="flex-shrink:0;margin-right:2px"><path d="'+path+'" fill="'+c+'" stroke="white" stroke-width="1"/></svg>';
+    return '<div class="leg-row">' + dot + '<span style="font-size:11px">' + label + '</span></div>';
+  }).join('') + (total > 5 ? '<div style="font-size:10px;color:var(--muted);margin-top:5px;padding-top:4px;border-top:1px solid var(--border)">+' + (total - 5) + ' more in Insights</div>' : '');
+}
+
+// ════════════════════════════════════════════════════════
+//  MARKER DRAWING  (rollup vs individual)
+// ════════════════════════════════════════════════════════
+function drawMarkers(systems, targetKey) {
+  clearMarkers();
+  const mode = document.getElementById('displayMode').value;
+
+  if (mode === 'rollup') {
+    // One marker per SYSTEM at centroid
+    Object.entries(systems).forEach(([sys, facs]) => {
+      const lats = facs.map(f => f.lat ?? f.center?.lat).filter(v => v != null);
+      const lons = facs.map(f => f.lon ?? f.center?.lon).filter(v => v != null);
+      if (!lats.length) return;
+      const lat = lats.reduce((a,b)=>a+b,0)/lats.length;
+      const lon = lons.reduce((a,b)=>a+b,0)/lons.length;
+      const isTarget = sys === targetKey;
+      const color = getColor(sys, targetKey);
+      const iconUrl = isTarget ? customIcons.target : customIcons.competitor;
+      const pinSize = isTarget ? parseInt(document.getElementById('targetPinSize').value) : 30;
+      const pinIcon = makePinIcon(color, pinSize, iconUrl || null);
+      const marker = L.marker([lat, lon], { icon: pinIcon, pane: isTarget?'targetPane':'defaultPane' });
+      marker.bindPopup(`<strong>${sys}</strong><br/><em style="color:#6b7280">${facs.length} facilit${facs.length===1?'y':'ies'} in area</em>`);
+      marker._cpiqSys = sys;
+      marker.addTo(mapInstance);
+      markers.push(marker);
+    });
+  } else {
+    // One marker per LOCATION
+    Object.entries(systems).forEach(([sys, facs]) => {
+      const isTarget = sys === targetKey;
+      const color = getColor(sys, targetKey);
+      facs.forEach(f => {
+        const lat = f.lat ?? f.center?.lat;
+        const lon = f.lon ?? f.center?.lon;
+        if (lat == null || lon == null) return;
+        const iconUrl = isTarget ? customIcons.target : customIcons.competitor;
+        const pinSize = isTarget ? parseInt(document.getElementById('targetPinSize').value) : 28;
+        const pinIcon = makePinIcon(color, pinSize, iconUrl || null);
+        const marker = L.marker([lat, lon], { icon: pinIcon, pane: isTarget?'targetPane':'defaultPane' });
+        var _popName = f.tags&&f.tags.name ? f.tags.name : 'Unknown';
+        var _popSrc = f.type==='npi'
+          ? '<br/><span style="font-size:10px;color:#94a3b8">NPI'+(f.npiType==='NPI-1'?' (Individual)':' (Org)')+(f.tags.npi_taxonomy_desc?' · '+f.tags.npi_taxonomy_desc:'')+'</span>'
+          : f.type==='cms'
+          ? '<br/><span style="font-size:10px;color:#94a3b8">CMS'+(f.tags.city?' · '+f.tags.city:'')+'</span>'
+          : '';
+        marker.bindPopup('<strong>'+_popName+'</strong><br/><em style="color:#6b7280">'+sys+'</em>'+_popSrc);
+        marker._cpiqSys = sys;
+        marker.addTo(mapInstance);
+        markers.push(marker);
+      });
+    });
+  }
+}
+
+// ════════════════════════════════════════════════════════
+//  ANALYTICS HELPERS
+// ════════════════════════════════════════════════════════
+function findTargetKey(systems, target) {
+  return Object.keys(systems).find(s => s.toLowerCase().includes(target.toLowerCase())) || null;
+}
+
+// Pressure ratio: competitor volume / target volume (higher = more pressure)
+function pressureRatio(targetCount, totalCompetitorCount) {
+  if (targetCount === 0) return totalCompetitorCount > 0 ? 99 : 0;
+  return (totalCompetitorCount / targetCount).toFixed(2);
+}
+
+// ED follow-up exposure: proxy = fraction of competitor facilities that are hospitals
+// (hospitals have EDs → discharged patients can easily follow up at competitor)
+function edExposure(competitorFacs, allFacs) {
+  // Score 0-100: ratio of competitor hospitals vs total hospitals
+  const total = allFacs.length;
+  if (total === 0) return 0;
+  return Math.round((competitorFacs.length / total) * 100);
+}
+
+function ratingLabel(score) {
+  if (score >= 75) return {label:'Critical', cls:'chip-red'};
+  if (score >= 50) return {label:'High',     cls:'chip-red'};
+  if (score >= 25) return {label:'Moderate', cls:'chip-yellow'};
+  return               {label:'Low',      cls:'chip-green'};
+}
+
+function gaugeHtml(pct, color) {
+  return `<div class="gauge-wrap"><div class="gauge-track"><div class="gauge-fill" style="width:${Math.min(pct,100)}%;background:${color}"></div></div></div>`;
+}
+
+// Generate plain-English summary for export panel
+function generateSummary(targetKey, targetCount, total, shareP, pr, edScore, competitors, leakage) {
+  const top      = competitors[0];
+  const second   = competitors[1];
+  const prNum    = parseFloat(pr);
+  const totalComp = total - targetCount;
+
+  // Opening: frame the competitive reality concisely
+  let txt = `${targetKey || 'Target'} holds <strong>${shareP}% market share</strong> with ${targetCount} location${targetCount===1?'':'s'} — facing ${totalComp} competitor sites across ${competitors.length} system${competitors.length===1?'':'s'} in this market. `;
+
+  // Top threat with stakes
+  if (top) {
+    const topShare = total > 0 ? Math.round((top.count / total) * 100) : 0;
+    txt += `<strong>${top.name}</strong> is the primary threat at ${top.count} sites (${topShare}% share)`;
+    if (second) {
+      const secShare = total > 0 ? Math.round((second.count / total) * 100) : 0;
+      txt += `, followed by <strong>${second.name}</strong> at ${second.count} sites (${secShare}%)`;
+    }
+    txt += `. `;
+  }
+
+  // Leakage signal
+  if (leakage.length > 0) {
+    txt += `<strong>${leakage.length} competitor system${leakage.length>1?'s':''}</strong> match or exceed ${targetKey||'target'}'s footprint — a direct indicator of active patient leakage. `;
+  }
+
+  // Call to action
+  if (prNum >= 2 || leakage.length > 0 || edScore >= 50) {
+    txt += `This market represents a significant care continuity opportunity. <em>Let's connect to discuss a targeted retention strategy.</em>`;
+  } else if (shareP >= 40) {
+    txt += `Market position is strong — proactive care coordination can protect and extend this advantage. <em>Let's connect to discuss how.</em>`;
+  } else {
+    txt += `Structured care coordination could meaningfully improve retention in this market. <em>Let's connect to explore the opportunity.</em>`;
+  }
+  return txt;
+}
+
+// ════════════════════════════════════════════════════════
+//  PANEL: INSIGHTS
+// ════════════════════════════════════════════════════════
+function buildInsights() {
+  const { systems, target } = lastData;
+  const el = document.getElementById('insights');
+  const targetKey   = findTargetKey(systems, target);
+  const targetFacs  = targetKey ? systems[targetKey] : [];
+  const targetCount = targetFacs.length;
+  const total       = Object.values(systems).reduce((a,v)=>a+v.length,0);
+  const totalComp   = total - targetCount;
+  const shareP      = total > 0 ? Math.round((targetCount/total)*100) : 0;
+  const compShareP  = total > 0 ? Math.round((totalComp/total)*100) : 0;
+
+  const competitors = Object.entries(systems)
+    .filter(([s]) => s !== targetKey)
+    .map(([name,arr]) => ({ name, count: arr.length, share: total>0?Math.round((arr.length/total)*100):0 }))
+    .sort((a,b) => b.count - a.count);
+
+  const totalCompCount = competitors.reduce((a,c)=>a+c.count,0);
+  const top     = competitors[0];
+  const leakage = competitors.filter(c => c.count >= targetCount);
+  const pr      = pressureRatio(targetCount, totalCompCount);
+  const prNum   = parseFloat(pr);
+  const allCompFacs = Object.entries(systems).filter(([s])=>s!==targetKey).flatMap(([,v])=>v);
+  const edScore     = edExposure(allCompFacs, Object.values(systems).flat());
+  const edRating    = ratingLabel(edScore);
+  const summary     = generateSummary(targetKey, targetCount, total, shareP, pr, edScore, competitors, leakage);
+
+  // Color helpers
+  const shareColor = shareP >= 40 ? '#16a34a' : shareP >= 20 ? '#2563eb' : '#e02424';
+  const prColor    = prNum >= 4 ? '#e02424' : prNum >= 2 ? '#ea580c' : prNum >= 1 ? '#2563eb' : '#16a34a';
+  const edColor    = edScore >= 50 ? '#e02424' : edScore >= 25 ? '#ea580c' : '#16a34a';
+  const lkColor    = leakage.length > 0 ? '#e02424' : '#16a34a';
+
+  // Insight card: metric + explanation
+  function insightCard(metric, value, pct, color, explanation, gauge=true) {
+    return `<div style="background:#fff;border:1px solid var(--border);border-left:3px solid ${color};
+      border-radius:6px;padding:10px 12px;margin-bottom:8px">
+      <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:2px">
+        <span style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text)">${metric}</span>
+        <span style="font-size:18px;font-weight:700;color:${color}">${value}</span>
+      </div>
+      ${gauge ? gaugeHtml(Math.min(typeof pct==='number'?pct:0, 100), color) : ''}
+      <div style="font-size:11px;color:var(--muted);margin-top:5px;line-height:1.5">${explanation}</div>
+    </div>`;
+  }
+
+  // Leakage systems rows — capped at top 10
+  const leakageTop10 = leakage.slice(0, 10);
+  const leakageRows = leakageTop10.length
+    ? leakageTop10.map((l, i) => {
+        const lShare = total > 0 ? Math.round((l.count / total) * 100) : 0;
+        const barW   = top && top.count > 0 ? Math.round((l.count / top.count) * 100) : 0;
+        const rank   = i + 1;
+        const isHighRisk = l.count >= targetCount;
+        return `<div style="padding:6px 0;border-bottom:1px solid var(--border)">
+          <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:3px">
+            <span style="font-size:12px;font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;margin-right:6px">
+              <span style="font-size:10px;color:var(--muted-2);font-weight:400;margin-right:4px">#${rank}</span>${l.name}
+            </span>
+            <span style="display:flex;gap:5px;align-items:center;flex-shrink:0">
+              <span style="font-size:11px;color:var(--muted)">${lShare}%</span>
+              <span class="chip ${isHighRisk ? 'chip-red' : 'chip-yellow'}">${l.count} sites</span>
+            </span>
+          </div>
+          <div style="height:4px;background:#f1f3f7;border-radius:99px;overflow:hidden">
+            <div style="height:100%;width:${barW}%;background:${isHighRisk ? '#e02424' : '#d97706'};border-radius:99px;transition:width .4s"></div>
+          </div>
+        </div>`;
+      }).join('')
+      + (leakage.length > 10 ? `<p style="font-size:10px;color:var(--muted);margin-top:6px;font-style:italic">+${leakage.length - 10} more systems not shown</p>` : '')
+    : '<p class="empty">No systems match or exceed target footprint.</p>';
+
+  // Competitor rows — top 10 by default, ranked
+  const compRowsHtml = competitors.length
+    ? competitors.slice(0, 10).map((c, i) => {
+        const isTopThreat = i === 0;
+        const isMaterial  = c.count >= targetCount;
+        const barW = top && top.count > 0 ? Math.round((c.count / top.count) * 100) : 0;
+        return `<div style="padding:6px 0;border-bottom:1px solid var(--border)">
+          <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:3px">
+            <span style="font-size:12px;font-weight:${isTopThreat?'700':'500'};color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;margin-right:6px">
+              <span style="font-size:10px;color:var(--muted-2);font-weight:400;margin-right:4px">#${i+1}</span>${c.name}
+              ${isTopThreat ? '<span style="font-size:9px;background:#fef2f2;color:#b91c1c;border:1px solid #fecaca;border-radius:3px;padding:1px 5px;margin-left:4px;vertical-align:middle">Top Threat</span>' : ''}
+            </span>
+            <span style="display:flex;gap:5px;align-items:center;flex-shrink:0">
+              <span style="font-size:11px;color:var(--muted)">${c.share}%</span>
+              <span class="val${isMaterial?' warn':''}" style="font-size:13px">${c.count}</span>
+            </span>
+          </div>
+          <div style="height:4px;background:#f1f3f7;border-radius:99px;overflow:hidden">
+            <div style="height:100%;width:${barW}%;background:${isTopThreat?'#e02424':'#94a3b8'};border-radius:99px;transition:width .4s"></div>
+          </div>
+        </div>`;
+      }).join('')
+      + (competitors.length > 10 ? `<p style="font-size:10px;color:var(--muted);margin-top:6px;font-style:italic">+${competitors.length - 10} additional systems in this market</p>` : '')
+    : '<p class="empty">No competitors found.</p>';
+
+  el.innerHTML = `
+    <!-- ── Narrative summary ── -->
+    <div class="sec">Market Intelligence Summary</div>
+    <div class="summary-box" style="font-size:12px;line-height:1.8;margin-bottom:12px">${summary}</div>
+
+    <!-- ── Head-to-head scoreboard ── -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:12px">
+      <div style="background:#f0f6ff;border:1px solid #bfdbfe;border-radius:8px;padding:10px 12px;text-align:center">
+        <div style="font-size:28px;font-weight:700;color:#1a56db;line-height:1">${targetCount}</div>
+        <div style="font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#1a56db;margin-top:3px">${targetKey||'Target'}</div>
+        <div style="font-size:10.5px;color:var(--muted);margin-top:2px">${shareP}% market share</div>
+      </div>
+      <div style="background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:10px 12px;text-align:center">
+        <div style="font-size:28px;font-weight:700;color:#e02424;line-height:1">${totalComp}</div>
+        <div style="font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#e02424;margin-top:3px">${competitors.length} Competitors</div>
+        <div style="font-size:10.5px;color:var(--muted);margin-top:2px">${compShareP}% market share</div>
+      </div>
+    </div>
+
+    <!-- ── Metric cards ── -->
+    <div class="sec">Key Risk Indicators</div>
+
+    ${insightCard(
+      'Market Share',
+      shareP + '%',
+      shareP,
+      shareColor,
+      (shareP >= 40
+        ? `Strong position — but <strong>${compShareP}% of this market still flows through competitor networks.</strong> Protecting that share requires active care coordination.`
+        : shareP >= 20
+        ? `<strong>${compShareP}% of facilities in this market belong to competitors.</strong> Without a retention strategy, a meaningful share of post-acute and follow-up volume is at risk.`
+        : shareP >= 10
+        ? `Competitors control <strong>${compShareP}% of this market.</strong> Patients have significantly more access points outside your network — a major leakage driver.`
+        : `Competitors dominate <strong>${compShareP}% of this market.</strong> This level of exposure makes uncoordinated patient leakage nearly inevitable without intervention.`)
+    )}
+
+    ${insightCard(
+      'Competitive Pressure',
+      pr + ':1',
+      Math.min(prNum/6*100, 100),
+      prColor,
+      `There are <strong>${pr} competitor locations for every 1 ${targetKey||'target'} location</strong> in this area.`
+      + (top ? ` <strong>${top.name}</strong> alone accounts for ${total>0?Math.round((top.count/total)*100):0}% of total facilities.` : '')
+      + (prNum >= 4
+          ? ` At this ratio, patients are far more likely to encounter a competitor touchpoint than a ${targetKey||'target'} one after discharge.`
+          : prNum >= 2
+          ? ` This level of density creates meaningful risk of patients defaulting to competitor follow-up care.`
+          : prNum >= 1
+          ? ` Competitor access is roughly on par with your network — follow-up leakage is a real risk.`
+          : ` Your network has the density advantage — care coordination can lock in that lead.`)
+    )}
+
+    ${(function(){
+      const siteRatio    = targetCount > 0 ? (totalComp / targetCount).toFixed(1) : 99;
+      const leakageScore = targetCount === 0 ? 100
+        : Math.min(Math.round((totalComp / targetCount) * 20), 100);
+      const leakageRating =
+        leakageScore >= 80 ? { label: 'Critical', color: '#e02424' } :
+        leakageScore >= 60 ? { label: 'High',     color: '#e02424' } :
+        leakageScore >= 35 ? { label: 'Moderate', color: '#ea580c' } :
+                             { label: 'Low',       color: '#16a34a' };
+
+      const topLeakNames = leakage.slice(0,2).map(l=>l.name).join(' and ');
+      let explanation = `<strong>${siteRatio} competitor sites exist for every 1 ${targetKey||'target'} site.</strong> `;
+      if (leakage.length > 0) {
+        explanation += `<strong>${topLeakNames}${leakage.length > 2 ? ' and ' + (leakage.length-2) + ' others' : ''}</strong> each match or exceed your footprint — meaning patients have a full-network alternative at every stage of their care journey. `;
+      }
+      explanation +=
+        leakageScore >= 80 ? `Without proactive outreach, the majority of discharged patients in this area are likely choosing follow-up care outside your network.` :
+        leakageScore >= 60 ? `A structured post-discharge program could recapture a significant portion of patients currently defaulting to competitor networks.` :
+        leakageScore >= 35 ? `Targeted care coordination at high-exposure points could meaningfully improve retention in this market.` :
+                             `Your network density is a competitive asset — a coordination program can convert it into measurable retention gains.`;
+      return insightCard('Patient Leakage Risk', leakageRating.label, leakageScore, leakageRating.color, explanation);
+    })()}}
+
+    ${insightCard(
+      'Post-Discharge Exposure',
+      edScore + '/100',
+      edScore,
+      edColor,
+      `<strong>${edScore}% of facilities in this market are competitor-owned</strong> — representing the share of care touchpoints where a discharged patient could default to a competing network for follow-up.`
+      + (edScore >= 75 ? ` With competitors controlling the majority of access points, systematic intervention is needed to prevent routine leakage.` :
+         edScore >= 50 ? ` More than half of follow-up access in this area runs through competitor networks — a compelling case for a structured care coordination program.` :
+         edScore >= 25 ? ` A meaningful share of post-discharge touchpoints belong to competitors. Proactive outreach at key transition points can close this gap.` :
+                         ` Your network controls most follow-up access in this market — care coordination can turn that into measurable loyalty and retention.`)
+    )}
+
+    <!-- ── Leakage systems ── -->
+    <div class="sec">Systems Exceeding Your Footprint</div>
+    <p style="font-size:11px;color:var(--muted);margin-bottom:8px;line-height:1.5">These competitors each operate as many or more sites than ${targetKey||'target'} in this area — indicating the highest leakage risk.</p>
+    ${leakageRows}
+
+    <!-- ── Full competitor breakdown ── -->
+    <div class="sec">Competitor Breakdown</div>
+    ${compRowsHtml}
+  `;
+}
+
+// ════════════════════════════════════════════════════════
+//  SYSTEM MANAGE HELPERS
+// ════════════════════════════════════════════════════════
+function buildSysManageRows(sysNames, targetKey) {
+  if (!sysNames.length) return '<p style="font-size:11px;color:var(--muted)">No systems yet.</p>';
+  return sysNames.map(function(s) {
+    const isCustom   = customSystemNames.includes(s);
+    const isTarget   = s === targetKey;
+    const isProtected = isTarget || s === 'Independent / Community';
+    return '<div style="display:flex;align-items:center;gap:5px;padding:4px 0;border-bottom:1px solid var(--border)">'
+      // Editable name
+      +'<input data-sys-orig="'+s.replace(/"/g,'&quot;')+'" value="'+s.replace(/"/g,'&quot;')+'" '
+        +'style="flex:1;font-size:11px;padding:3px 6px;border:1px solid var(--border);'
+        +'border-radius:4px;background:'+(isCustom?'#fffbeb':'var(--bg)')+';color:var(--text);'
+        +(isProtected?'opacity:.6;':'')+'font-weight:'+(isTarget?'700':'400')+'" '
+        +(isProtected ? 'readonly ' : '')
+        +'onblur="handleSysRename(this)" '
+        +'onkeydown="if(event.key===String.fromCharCode(13))this.blur()" '
+        +'title="'+(isCustom?'Custom system (editable)':'From search results')+(isTarget?' — Target':'')+'"'
+      +'/>'
+      // Badge
+      +(isTarget ? '<span style="font-size:9px;background:#dbeafe;color:#1d4ed8;padding:1px 5px;border-radius:99px;white-space:nowrap">TARGET</span>' : '')
+      +(isCustom && !isTarget ? '<span style="font-size:9px;background:#fef9c3;color:#854d0e;padding:1px 5px;border-radius:99px">custom</span>' : '')
+      // Remove button (only for custom, non-protected)
+      +(isCustom && !isProtected
+        ? '<button data-remove-sys="'+s.replace(/"/g,'&quot;')+'" onclick="removeCustomSystemUI(this.dataset.removeSys)" '
+            +'style="font-size:11px;background:none;border:1px solid var(--border);border-radius:4px;'
+            +'padding:1px 6px;cursor:pointer;color:var(--muted);flex-shrink:0" '
+            +'title="Remove this system name">✕</button>'
+        : '')
+      +'</div>';
+  }).join('');
+}
+
+function addCustomSystemUI() {
+  const input = document.getElementById('newSysInput');
+  if (!input) return;
+  const name = input.value.trim();
+  if (!name) return;
+  if (!addCustomSystem(name)) {
+    showError('That system name already exists.');
+    return;
+  }
+  input.value = '';
+  buildAssign(); // Rebuild to show new system in list and all dropdowns
+}
+
+function removeCustomSystemUI(name) {
+  if (!confirm('Remove "'+name+'" from the system list? Facilities currently assigned to it will revert to auto-detection.')) return;
+  removeCustomSystem(name);
+  // Clear any overrides pointing at this system
+  Object.keys(systemOverrides).forEach(function(fid) {
+    if (systemOverrides[fid] === name) delete systemOverrides[fid];
+  });
+  saveOverrides();
+  if (lastData && lastData.systems) rebuildFromOverrides();
+  buildAssign();
+}
+
+function handleSysRename(input) {
+  const oldName = input.dataset.sysOrig;
+  const newName = input.value.trim();
+  if (!newName || newName === oldName) { input.value = oldName; return; }
+  if (!renameCustomSystem(oldName, newName)) { input.value = oldName; return; }
+  input.dataset.sysOrig = newName;
+  input.style.background = '#f0fdf4'; // brief green flash
+  setTimeout(function(){ input.style.background = '#fffbeb'; }, 800);
+  if (lastData && lastData.systems) rebuildFromOverrides();
+  // Rebuild dropdowns to reflect rename
+  setTimeout(function(){ buildAssign(); }, 900);
+}
+
+// ════════════════════════════════════════════════════════
+//  PANEL: ASSIGN (manual system override)
+// ════════════════════════════════════════════════════════
+// Stores user overrides: { facilityOsmId: 'System Name' }
+// Persists to localStorage so assignments survive page reloads
+const LS_OVERRIDES_KEY   = 'cpiq_system_overrides';
+const LS_CUSTOM_SYS_KEY  = 'cpiq_custom_systems';
+
+// User-defined system names that always appear in Assign dropdowns
+let customSystemNames = [];
+try {
+  const saved = localStorage.getItem(LS_CUSTOM_SYS_KEY);
+  if (saved) customSystemNames = JSON.parse(saved);
+} catch(e) {}
+
+function saveCustomSystems() {
+  try { localStorage.setItem(LS_CUSTOM_SYS_KEY, JSON.stringify(customSystemNames)); }
+  catch(e) {}
+}
+
+function addCustomSystem(name) {
+  name = name.trim();
+  if (!name) return false;
+  if (customSystemNames.includes(name)) return false;
+  customSystemNames.push(name);
+  customSystemNames.sort();
+  saveCustomSystems();
+  return true;
+}
+
+function removeCustomSystem(name) {
+  customSystemNames = customSystemNames.filter(function(s){ return s !== name; });
+  saveCustomSystems();
+}
+
+function renameCustomSystem(oldName, newName) {
+  newName = newName.trim();
+  if (!newName || newName === oldName) return false;
+  const idx = customSystemNames.indexOf(oldName);
+  if (idx === -1) return false;
+  customSystemNames[idx] = newName;
+  customSystemNames.sort();
+  saveCustomSystems();
+  // Update any overrides pointing at the old name
+  Object.keys(systemOverrides).forEach(function(fid) {
+    if (systemOverrides[fid] === oldName) systemOverrides[fid] = newName;
+  });
+  saveOverrides();
+  return true;
+}
+let systemOverrides = {};
+try {
+  const saved = localStorage.getItem(LS_OVERRIDES_KEY);
+  if (saved) systemOverrides = JSON.parse(saved);
+} catch(e) { console.warn('Could not load saved overrides:', e); }
+
+function saveOverrides() {
+  try { localStorage.setItem(LS_OVERRIDES_KEY, JSON.stringify(systemOverrides)); }
+  catch(e) { console.warn('Could not save overrides:', e); }
+}
+
+function buildAssign() {
+  const el = document.getElementById('assign');
+  if (!el) return;
+
+  if (!lastData || !lastData.systems) {
+    el.innerHTML = '<p class="empty">Run a search to manage assignments.</p>';
+    return;
+  }
+
+  const { systems, target } = lastData;
+  const targetKey = findTargetKey(systems, target);
+
+  // Flatten all facilities with their current bucket
+  const allFacs = [];
+  Object.entries(systems).forEach(function([sys, facs]) {
+    facs.forEach(function(f) {
+      allFacs.push({ id: f.id, name: f.tags && f.tags.name ? f.tags.name : 'Unknown', sys });
+    });
+  });
+  allFacs.sort(function(a,b){ return a.name.localeCompare(b.name); });
+
+  // Merge search-result systems + user-defined custom systems for dropdown
+  const sysNames = [...new Set([...Object.keys(systems), ...customSystemNames])].sort();
+  const overrideCount = Object.keys(systemOverrides).length;
+
+  // Manually excluded IDs (stored in localStorage)
+  const excluded = getExcluded();
+
+  el.innerHTML =
+    '<div class="sec">Manual System Assignment</div>'
+    +'<p style="font-size:11px;color:var(--muted);margin-bottom:8px;line-height:1.5">'
+      +'Reassign facilities to the correct system, or exclude ones that don\'t belong. '
+      +'<strong>Assignments persist across searches and reloads.</strong>'
+    +'</p>'
+
+    // Search bar
+    +'<input id="assignSearch" placeholder="🔍  Search facilities…" oninput="filterAssignList(this.value)" '
+      +'style="width:100%;margin-bottom:8px"/>'
+
+    // Stats + reset
+    +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">'
+      +'<span style="font-size:10px;color:var(--muted)">'
+        + allFacs.length + ' facilities · '
+        + overrideCount + ' reassigned · '
+        + excluded.size + ' excluded'
+      +'</span>'
+      +'<button onclick="clearAllOverrides()" '
+        +'style="font-size:10px;color:var(--red);background:none;border:none;cursor:pointer;padding:0">'
+        +'Reset all'
+      +'</button>'
+    +'</div>'
+
+    // Facility list
+    +'<div id="assignList">'
+    + allFacs.map(function(f) {
+        const isExcluded = excluded.has(f.id);
+        const isOverridden = !!systemOverrides[f.id];
+        const rowStyle = isExcluded
+          ? 'opacity:.45;'
+          : '';
+        const sysOpts = sysNames.map(function(s) {
+          return '<option value="'+s+'"'+(s===f.sys?' selected':'')
+            +(s===targetKey?' style="font-weight:700"':'')+'>'+s+'</option>';
+        }).join('') + '<option value="__custom__">— Custom name —</option>';
+
+        return '<div class="assign-row" data-name="'+f.name.toLowerCase()+'" '
+          +'style="padding:5px 0;border-bottom:1px solid var(--border);'+rowStyle+'">'
+          +'<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:4px">'
+            +'<div style="font-size:11px;font-weight:600;color:var(--text);'
+              +'overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1" title="'+f.name+'">'+f.name+'</div>'
+            +'<div style="display:flex;gap:3px;flex-shrink:0">'
+              +(isOverridden ? '<span style="font-size:9px;color:#16a34a;padding-top:2px">✓</span>' : '')
+              +'<button onclick="toggleExclude('+f.id+',this)" title="'+(isExcluded?'Un-exclude':'Exclude this facility')+'" '
+                +'style="font-size:10px;background:none;border:1px solid var(--border);border-radius:3px;'
+                +'padding:1px 5px;cursor:pointer;color:'+(isExcluded?'var(--accent)':'var(--muted)')+';">'
+                +(isExcluded ? 'Un-exclude' : 'Exclude')
+              +'</button>'
+            +'</div>'
+          +'</div>'
+          +'<select data-fid="'+f.id+'" onchange="applyOverride(this)" '
+            +'style="width:100%;margin-top:3px;font-size:11px;padding:3px 5px;'
+            +'border:1px solid var(--border);border-radius:4px;background:var(--bg);color:var(--text)">'
+            +sysOpts
+          +'</select>'
+          +'</div>';
+      }).join('')
+    +'</div>'
+
+    // ── Manage Systems section ──────────────────────────────────────────────
+    +'<div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--border)">'
+      +'<div class="sec">Manage System Names</div>'
+      +'<p style="font-size:11px;color:var(--muted);margin-bottom:8px;line-height:1.5">'
+        +'Add, rename, or remove system names that appear in every assignment dropdown. '
+        +'Saved permanently.'
+      +'</p>'
+
+      // Add new system
+      +'<div style="display:flex;gap:5px;margin-bottom:10px">'
+        +'<input id="newSysInput" placeholder="New system name…" '
+          +'style="flex:1;font-size:11px" '
+          +'onkeydown="if(event.key===String.fromCharCode(13))addCustomSystemUI()"/>'
+        +'<button onclick="addCustomSystemUI()" '
+          +'style="padding:5px 10px;background:var(--accent);color:#fff;border:none;'
+          +'border-radius:5px;font-size:11px;cursor:pointer;white-space:nowrap;font-family:inherit">'
+          +'+ Add'
+        +'</button>'
+      +'</div>'
+
+      // List of all systems (search results + custom)
+      +'<div id="sysManageList">'
+        + buildSysManageRows(sysNames, targetKey)
+      +'</div>'
+    +'</div>'
+
+    // ── Import from Excel section ────────────────────────────────────────────
+    +'<div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--border)">'
+      +'<div class="sec">Import from Excel / CSV</div>'
+      +'<p style="font-size:11px;color:var(--muted);margin-bottom:8px;line-height:1.5">'
+        +'Import a spreadsheet of locations. Required columns: <strong>Name</strong>, <strong>Latitude</strong>, <strong>Longitude</strong>. '
+        +'Optional: <strong>System</strong>, <strong>Address</strong>, <strong>City</strong>, <strong>State</strong>. '
+        +'Lat/Lon avoids geocoding delays. Use a large file (200k rows) as your primary source.'
+      +'</p>'
+      +'<input type="file" id="excelImportFile" accept=".xlsx,.xls,.csv" '
+        +'style="width:100%;margin-bottom:6px;font-size:11px" onchange="importExcelFacilities(this)"/>'
+      +'<div id="excelImportStatus" style="font-size:10px;color:var(--muted);line-height:1.5;min-height:14px"></div>'
+    +'</div>'
+
+    // ── Add Facility Manually section ────────────────────────────────────────
+    +'<div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--border)">'
+      +'<div class="sec">Add Location Manually</div>'
+      +'<p style="font-size:11px;color:var(--muted);margin-bottom:8px;line-height:1.5">'
+        +'Add any location with an address — it will be geocoded and pinned on the map.'
+      +'</p>'
+      +'<input id="manualFacName"   placeholder="Facility / Practice name *" style="width:100%;margin-bottom:5px"/>'
+      +'<input id="manualFacAddr"   placeholder="Street address *" style="width:100%;margin-bottom:5px"/>'
+      +'<div style="display:grid;grid-template-columns:1fr 56px 80px;gap:5px;margin-bottom:5px">'
+        +'<input id="manualFacCity"  placeholder="City *"/>'
+        +'<input id="manualFacState" placeholder="ST" maxlength="2" style="text-transform:uppercase"/>'
+        +'<input id="manualFacZip"   placeholder="ZIP" maxlength="10"/>'
+      +'</div>'
+      +'<input id="manualFacSystem" placeholder="Health system (leave blank to auto-detect)" style="width:100%;margin-bottom:8px"/>'
+      +'<button id="manualAddBtn" onclick="addManualFacility()" '
+        +'style="width:100%;padding:7px;background:var(--accent);color:#fff;border:none;'
+        +'border-radius:5px;font-size:11px;cursor:pointer;font-family:inherit;font-weight:600">📍 Geocode &amp; Add</button>'
+      +'<div id="manualAddStatus" style="font-size:10px;color:var(--muted);margin-top:4px;min-height:14px"></div>'
+    +'</div>';
+}
+
+// ── Exclude helpers (persisted in localStorage) ──────────────────────────────
+const LS_EXCLUDED_KEY = 'cpiq_excluded_facilities';
+
+function getExcluded() {
+  try {
+    const s = localStorage.getItem(LS_EXCLUDED_KEY);
+    return s ? new Set(JSON.parse(s)) : new Set();
+  } catch(e) { return new Set(); }
+}
+
+function saveExcluded(set) {
+  try { localStorage.setItem(LS_EXCLUDED_KEY, JSON.stringify([...set])); } catch(e) {}
+}
+
+function toggleExclude(fid, btn) {
+  const excluded = getExcluded();
+  if (excluded.has(fid)) {
+    excluded.delete(fid);
+    btn.textContent = 'Exclude';
+    btn.style.color = 'var(--muted)';
+    btn.closest('.assign-row').style.opacity = '1';
+  } else {
+    excluded.add(fid);
+    btn.textContent = 'Un-exclude';
+    btn.style.color = 'var(--accent)';
+    btn.closest('.assign-row').style.opacity = '.45';
+  }
+  saveExcluded(excluded);
+  rebuildFromOverrides();
+}
+
+// ── Manual facility add ───────────────────────────────────────────────────────
+let manualFacilities = [];
+try {
+  const s = localStorage.getItem('cpiq_manual_facs');
+  if (s) manualFacilities = JSON.parse(s);
+} catch(e) {}
+
+async function addManualFacility() {
+  var name   = document.getElementById('manualFacName').value.trim();
+  var addr   = document.getElementById('manualFacAddr')   ? document.getElementById('manualFacAddr').value.trim()   : '';
+  var city   = document.getElementById('manualFacCity')   ? document.getElementById('manualFacCity').value.trim()   : '';
+  var state  = document.getElementById('manualFacState')  ? document.getElementById('manualFacState').value.trim().toUpperCase() : '';
+  var zip    = document.getElementById('manualFacZip')    ? document.getElementById('manualFacZip').value.trim()    : '';
+  var system = document.getElementById('manualFacSystem') ? document.getElementById('manualFacSystem').value.trim() : '';
+
+  if (!name) { showError('Facility name is required.'); return; }
+  if (!addr && !city && !zip) { showError('Enter at least a street address or city/ZIP.'); return; }
+
+  var btn    = document.getElementById('manualAddBtn');
+  var status = document.getElementById('manualAddStatus');
+  if (btn) btn.disabled = true;
+  if (status) status.textContent = 'Geocoding address…';
+
+  try {
+    // Geocode the address
+    var coords = await geocodeAddress(addr, city, state, zip);
+    if (!coords) {
+      // Try with less specificity
+      coords = await geocodeAddress('', city, state, zip);
+    }
+    if (!coords) {
+      if (status) status.textContent = '✗ Could not geocode address. Check the address and try again.';
+      if (btn) btn.disabled = false;
+      return;
+    }
+
+    var facId = 'manual_' + Date.now();
+    var fac = {
+      id:   facId,
+      type: 'manual',
+      lat:  coords.lat,
+      lon:  coords.lon,
+      tags: {
+        name:    name,
+        address: addr,
+        city:    city,
+        state:   state,
+        postcode:zip
+      }
+    };
+
+    // Store in persisted manual list
+    var entry = { id: facId, name, addr, city, state, zip, system, lat: coords.lat, lon: coords.lon };
+    manualFacilities.push(entry);
+    try { localStorage.setItem('cpiq_manual_facs', JSON.stringify(manualFacilities)); } catch(e) {}
+
+    // If system specified, apply as override; else auto-detect from groupBySystem
+    if (system) {
+      systemOverrides[facId] = system;
+      saveOverrides();
+    }
+
+    // Add to rawFacilities and rebuild map
+    if (lastData && lastData.rawFacilities) {
+      lastData.rawFacilities.push(fac);
+      rebuildFromOverrides();
+    }
+
+    // Clear form
+    ['manualFacName','manualFacAddr','manualFacCity','manualFacState','manualFacZip','manualFacSystem']
+      .forEach(function(id){ var el = document.getElementById(id); if(el) el.value = ''; });
+    if (status) status.textContent = '✓ Added: ' + name + ' (' + coords.lat.toFixed(4) + ', ' + coords.lon.toFixed(4) + ')';
+    if (btn) btn.disabled = false;
+
+  } catch(e) {
+    if (status) status.textContent = '✗ Error: ' + e.message;
+    if (btn) btn.disabled = false;
+  }
+}
+
+// ── Excel / CSV import ───────────────────────────────────────────────────────
+// Stored imported facilities persist across sessions
+var LS_EXCEL_KEY = 'cpiq_excel_facilities';
+var excelFacilities = [];
+try {
+  var _ef = localStorage.getItem(LS_EXCEL_KEY);
+  if (_ef) excelFacilities = JSON.parse(_ef);
+} catch(e) {}
+
+function saveExcelFacilities() {
+  try { localStorage.setItem(LS_EXCEL_KEY, JSON.stringify(excelFacilities)); } catch(e) {}
+}
+
+// Column name aliases — maps common header variations to our standard fields
+var COL_ALIASES = {
+  name:    ['name','displayname','display name','facility','facility name',
+            'provider','provider name','practice','location','site','hospital','clinic',
+            'organizationname','organization name','legalname','legal name'],
+  lat:     ['lat','latitude','lat_dd','y','latitude_dd'],
+  lon:     ['lon','lng','longitude','long','lon_dd','x','longitude_dd'],
+  system:  ['system','health system','parent system','organization','org','network','group'],
+  address: ['address','street','addr','street address','address1','address_1'],
+  city:    ['city','city name'],
+  state:   ['state','st','state_cd','state code'],
+  zip:     ['zip','zipcode','zip code','postal','postal code','postcode'],
+  type:    ['type','facility type','provider type','category']
+};
+
+// findCol normalises spaces/case so 'DisplayName' matches 'displayname'
+
+
+function findCol(headers, field) {
+  var aliases = COL_ALIASES[field] || [];
+  for (var i = 0; i < headers.length; i++) {
+    var h = headers[i].toString().toLowerCase().trim();
+    if (aliases.indexOf(h) >= 0) return headers[i];
+  }
+  return null;
+}
+
+async function importExcelFacilities(input) {
+  var file = input.files[0];
+  if (!file) return;
+  var status = document.getElementById('excelImportStatus');
+  if (status) status.textContent = 'Reading file…';
+
+  try {
+    // Check SheetJS is loaded
+    if (typeof XLSX === 'undefined') {
+      if (status) status.textContent = '✗ SheetJS library not loaded. Check internet connection.';
+      return;
+    }
+
+    var arrayBuffer = await new Promise(function(resolve, reject) {
+      var reader = new FileReader();
+      reader.onload  = function(e){ resolve(e.target.result); };
+      reader.onerror = reject;
+      reader.readAsArrayBuffer(file);
+    });
+
+    var workbook = XLSX.read(new Uint8Array(arrayBuffer), { type: 'array' });
+    var sheet    = workbook.Sheets[workbook.SheetNames[0]];
+    var rows     = XLSX.utils.sheet_to_json(sheet, { defval: '' });
+
+    if (!rows.length) { if (status) status.textContent = '✗ No data found in file.'; return; }
+
+    // Detect columns
+    var headers = Object.keys(rows[0]);
+    var colName  = findCol(headers, 'name');
+    var colLat   = findCol(headers, 'lat');
+    var colLon   = findCol(headers, 'lon');
+    var colSys   = findCol(headers, 'system');
+    var colAddr  = findCol(headers, 'address');
+    var colCity  = findCol(headers, 'city');
+    var colState = findCol(headers, 'state');
+    var colZip   = findCol(headers, 'zip');
+
+    if (!colName) { if (status) status.textContent = '✗ No "Name" column found. Headers: ' + headers.slice(0,6).join(', '); return; }
+    var hasCoords = !!(colLat && colLon);
+    if (status) status.textContent = 'Processing ' + rows.length.toLocaleString() + ' rows' + (hasCoords ? ' (using lat/lon)' : ' (will geocode — may be slow)') + '…';
+
+    // Process rows
+    var newFacs = [];
+    var skipped = 0;
+    var needsGeocode = [];
+
+    for (var i = 0; i < rows.length; i++) {
+      var row  = rows[i];
+      var name = colName ? String(row[colName] || '').trim() : '';
+      if (!name) { skipped++; continue; }
+
+      var lat = colLat ? parseFloat(row[colLat]) : NaN;
+      var lon = colLon ? parseFloat(row[colLon]) : NaN;
+      var sys  = colSys   ? String(row[colSys]   || '').trim() : '';
+      var addr = colAddr  ? String(row[colAddr]  || '').trim() : '';
+      var city = colCity  ? String(row[colCity]  || '').trim() : '';
+      var st   = colState ? String(row[colState] || '').trim() : '';
+      var zip  = colZip   ? String(row[colZip]   || '').trim() : '';
+
+      var fac = {
+        id:    'excel_' + i + '_' + Date.now(),
+        type:  'excel',
+        lat:   isNaN(lat) ? null : lat,
+        lon:   isNaN(lon) ? null : lon,
+        tags:  { name, address: addr, city, state: st, postcode: zip }
+      };
+
+      if (sys) systemOverrides[fac.id] = sys;
+
+      if (!isNaN(lat) && !isNaN(lon)) {
+        newFacs.push(fac);
+      } else if (addr || city || zip) {
+        needsGeocode.push({ fac, addr, city, st, zip });
+      } else {
+        skipped++;
+      }
+    }
+
+    // Geocode rows without coordinates — capped at 500 for browser performance.
+    // If your file has lat/lon already this block is skipped entirely.
+    var toGeocode = needsGeocode.slice(0, 500);
+    if (toGeocode.length > 0) {
+      if (status) status.textContent = 'Geocoding ' + toGeocode.length + ' rows without coordinates…';
+      for (var g = 0; g < toGeocode.length; g += 10) {
+        var gBatch = toGeocode.slice(g, g + 10);
+        var gRes = await Promise.all(gBatch.map(function(item) {
+          return geocodeAddress(item.addr, item.city, item.st, item.zip)
+            .then(function(coords) {
+              if (coords) { item.fac.lat = coords.lat; item.fac.lon = coords.lon; }
+              return item.fac;
+            });
+        }));
+        gRes.forEach(function(f){ if (f.lat) newFacs.push(f); else skipped++; });
+        if (g + 10 < toGeocode.length) await new Promise(function(r){ setTimeout(r, 150); });
+        if (status) status.textContent = 'Geocoding ' + Math.min(g+10, toGeocode.length) + '/' + toGeocode.length + '…';
+      }
+      skipped += needsGeocode.length - toGeocode.length; // cap remainder
+    }
+
+    // Save and apply
+    excelFacilities = excelFacilities.concat(newFacs);
+    saveExcelFacilities();
+    saveOverrides();
+
+    // Apply to current search if one has been run
+    if (lastData && lastData.rawFacilities) {
+      // Deduplicate by name+proximity against existing
+      var toAdd = newFacs.filter(function(ef) {
+        return !lastData.rawFacilities.some(function(ex) {
+          if (!ex.lat || !ef.lat) return false;
+          var sameName = (ex.tags&&ex.tags.name||'').toLowerCase() === ef.tags.name.toLowerCase();
+          return sameName && haversineMeters(ef.lat, ef.lon, ex.lat, ex.lon) < 200;
+        });
+      });
+      lastData.rawFacilities = lastData.rawFacilities.concat(toAdd);
+      rebuildFromOverrides();
+      if (status) status.textContent = '✓ Imported ' + newFacs.length.toLocaleString() + ' locations (' + toAdd.length + ' new on map, ' + skipped + ' skipped). Persisted for future searches.';
+    } else {
+      if (status) status.textContent = '✓ Imported ' + newFacs.length.toLocaleString() + ' locations (run a search to show them). ' + skipped + ' rows skipped.';
+    }
+
+    input.value = ''; // reset file input
+    buildAssign();    // refresh assign panel counts
+
+  } catch(e) {
+    if (status) status.textContent = '✗ Import error: ' + e.message;
+    console.error('Excel import error:', e);
+  }
+}
+
+// Load persisted Excel facilities into rawFacilities on each search.
+// Critically: only adds facilities within the current search radius so we never
+// load all 130k+ rows into the browser at once — only the local subset.
+function applyExcelFacilities(rawFacilities, centerLat, centerLon, radiusMeters, selectedTypes) {
+  // Merge embedded locations — pass selected types so we only get relevant ones
+  var embedded = (typeof getEmbeddedFacilities === 'function') ? getEmbeddedFacilities(selectedTypes) : [];
+  embedded.forEach(function(ef) {
+    if (ef._embeddedSystem && !systemOverrides[ef.id]) systemOverrides[ef.id] = ef._embeddedSystem;
+  });
+  var importedOnly = excelFacilities.filter(function(ef) {
+    return !embedded.some(function(em) {
+      return em.tags.name.toLowerCase() === (ef.tags&&ef.tags.name||'').toLowerCase()
+          && haversineMeters(em.lat, em.lon, ef.lat||0, ef.lon||0) < 300;
+    });
+  });
+  var allExcel = embedded.concat(importedOnly);
+  if (!allExcel.length) return rawFacilities;
+
+  var existing = rawFacilities;
+  // *** Use allExcel (embedded + imported) NOT just excelFacilities ***
+  var inRadius = allExcel.filter(function(ef) {
+    if (!ef.lat || !ef.lon) return false;
+    if (!centerLat || !centerLon) return true;
+    return haversineMeters(centerLat, centerLon, ef.lat, ef.lon) <= (radiusMeters || 40000);
+  });
+
+  var toAdd = inRadius.filter(function(ef) {
+    // Deduplicate against existing results by name + proximity
+    return !existing.some(function(ex) {
+      var exLat = ex.lat || (ex.center && ex.center.lat);
+      var exLon = ex.lon || (ex.center && ex.center.lon);
+      if (!exLat) return false;
+      var sameName = (ex.tags&&ex.tags.name||'').toLowerCase().slice(0,20) ===
+                     (ef.tags&&ef.tags.name||'').toLowerCase().slice(0,20);
+      return sameName && haversineMeters(ef.lat, ef.lon, exLat, exLon) < 300;
+    });
+  });
+
+  console.log('Excel: ' + allExcel.length.toLocaleString() + ' total | '
+    + inRadius.length + ' in radius | ' + toAdd.length + ' new (not in OSM/NPI/CMS)');
+  return existing.concat(toAdd);
+}
+
+function filterAssignList(query) {
+  const q = query.toLowerCase();
+  document.querySelectorAll('.assign-row').forEach(function(row) {
+    row.style.display = row.dataset.name.includes(q) ? '' : 'none';
+  });
+}
+
+function applyOverride(select) {
+  const fid   = parseInt(select.dataset.fid);
+  let newSys  = select.value;
+
+  if (newSys === '__custom__') {
+    const custom = prompt('Enter the system name to assign this facility to:');
+    if (!custom || !custom.trim()) { select.value = select.dataset.prev || ''; return; }
+    newSys = custom.trim();
+  }
+  select.dataset.prev = newSys;
+
+  // Store override and rebuild grouping from scratch
+  systemOverrides[fid] = newSys;
+  saveOverrides();
+  rebuildFromOverrides();
+}
+
+function clearAllOverrides() {
+  Object.keys(systemOverrides).forEach(k => delete systemOverrides[k]);
+  saveOverrides();
+  rebuildFromOverrides();
+}
+
+function rebuildFromOverrides() {
+  if (!lastData || !lastData.rawFacilities) return;
+
+  const excluded = getExcluded();
+
+  // Re-group using raw facilities, filtering out excluded ones
+  const activeFacs = lastData.rawFacilities.filter(function(f) {
+    return !excluded.has(f.id) && !excluded.has(String(f.id));
+  });
+
+  const newSystems = groupBySystem(activeFacs, lastData.target);
+
+  // Apply overrides on top
+  Object.entries(systemOverrides).forEach(function([fidStr, newSys]) {
+    const fid = isNaN(parseInt(fidStr)) ? fidStr : parseInt(fidStr);
+    // Remove from current bucket
+    Object.entries(newSystems).forEach(function([sys, facs]) {
+      const idx = facs.findIndex(function(f){ return f.id === fid; });
+      if (idx !== -1) {
+        facs.splice(idx, 1);
+        if (facs.length === 0) delete newSystems[sys];
+      }
+    });
+    // Add to new bucket
+    const fac = lastData.rawFacilities.find(function(f){ return f.id === fid; });
+    if (fac && !excluded.has(fac.id) && !excluded.has(String(fac.id))) {
+      if (!newSystems[newSys]) newSystems[newSys] = [];
+      newSystems[newSys].push(fac);
+    }
+  });
+
+  lastData.systems = newSystems;
+  resetColors();
+  const targetKey = findTargetKey(newSystems, lastData.target);
+  buildLegend(newSystems, targetKey);
+  drawMarkers(newSystems, targetKey);
+  buildInsights();
+  buildAccount();
+  buildAssign();
+  buildCompFilterBar(newSystems, targetKey);
+  // Re-apply any active filter after rebuild
+  if (compFilterActive.size > 0 || compFocusModeOn) applyCompFilter();
+}
+
+// ════════════════════════════════════════════════════════
+//  PANEL: ACCOUNT (TARGET)
+// ════════════════════════════════════════════════════════
+function buildAccount() {
+  const { systems, target } = lastData;
+  const el = document.getElementById('account');
+  const targetKey = findTargetKey(systems, target);
+  const facilities = targetKey ? systems[targetKey] : [];
+  const count = facilities.length;
+  const allCounts = Object.values(systems).map(v=>v.length).sort((a,b)=>b-a);
+  const rank = allCounts.indexOf(count)+1;
+  const total = allCounts.reduce((a,v)=>a+v,0);
+  const share = total>0?Math.round((count/total)*100):0;
+  const position = count>=10?'Dominant':count>=5?'Strong':count>=2?'Moderate':'Minimal';
+  const names = facilities.map(h=>h.tags?.name).filter(Boolean).sort();
+
+  el.innerHTML = `
+    <div class="sec">Target Profile</div>
+    <div class="row"><span class="lbl">System</span><span class="val" style="font-size:11px">${targetKey||target}</span></div>
+    <div class="row"><span class="lbl">Facilities in Area</span><span class="val">${count}</span></div>
+    <div class="row"><span class="lbl">Market Share</span><span class="val">${share}%</span></div>
+    <div class="row"><span class="lbl">Market Rank</span><span class="val">#${rank}</span></div>
+    <div class="row"><span class="lbl">Position</span><span class="val">${position}</span></div>
+    ${names.length?`
+      <div class="sec">Identified Facilities (${names.length})</div>
+      ${names.map(n=>`<div class="row"><span class="lbl">${n}</span></div>`).join('')}
+    `:'<p class="empty" style="margin-top:10px">No named facilities found for this system.</p>'}
+  `;
+}
+
+// ════════════════════════════════════════════════════════
+//  PANEL: MESSAGE
+// ════════════════════════════════════════════════════════
+// ════════════════════════════════════════════════════════
+//  FACILITY TYPE MULTI-SELECT HELPERS
+// ════════════════════════════════════════════════════════
+function toggleFtypeMenu(e) {
+  e.stopPropagation();
+  const menu = document.getElementById('ftypeMenu');
+  const btn  = document.getElementById('ftypeBtn');
+  const isOpen = menu.classList.contains('open');
+  if (isOpen) {
+    menu.classList.remove('open');
+  } else {
+    // Position menu below the button using fixed coordinates
+    const rect = btn.getBoundingClientRect();
+    menu.style.top  = (rect.bottom + 4) + 'px';
+    menu.style.left = rect.left + 'px';
+    menu.classList.add('open');
+  }
+}
+// Close menu when clicking outside
+document.addEventListener('click', (e) => {
+  const menu = document.getElementById('ftypeMenu');
+  const btn  = document.getElementById('ftypeBtn');
+  if (menu && !menu.contains(e.target) && e.target !== btn && !btn.contains(e.target)) {
+    menu.classList.remove('open');
+  }
+});
+
+function getSelectedFtypes() {
+  return [...document.querySelectorAll('#ftypeMenu input[type=checkbox]:checked')]
+    .map(cb => cb.value);
+}
+
+function updateFtypeSummary() {
+  const selected = getSelectedFtypes();
+  const all = ['hospital','clinic','ed','outpatient','rehab','urgent_care','specialist'];
+  const summary = document.getElementById('ftypeSummary');
+  if (!selected.length) {
+    summary.textContent = 'None selected';
+  } else if (selected.length === all.length) {
+    summary.textContent = 'All Types';
+  } else if (selected.length === 1) {
+    const labels = {hospital:'Hospital',clinic:'Clinic',ed:'ED',outpatient:'Outpatient',rehab:'Rehab',urgent_care:'Urgent Care',specialist:'Specialists'};
+    summary.textContent = labels[selected[0]] || selected[0];
+  } else {
+    summary.textContent = selected.length + ' types selected';
+  }
+}
+
+function setAllFtypes(checked) {
+  document.querySelectorAll('#ftypeMenu input[type=checkbox]').forEach(cb => cb.checked = checked);
+  updateFtypeSummary();
+}
+
+// ════════════════════════════════════════════════════════
+//  MAIN SEARCH
+// ════════════════════════════════════════════════════════
+async function runSearch() {
+  clearError();
+  const zip    = document.getElementById('zipInput').value.trim();
+  const target = document.getElementById('targetInput').value.trim();
+  const radius = parseInt(document.getElementById('radiusSelect').value, 10);
+  const ftype = getSelectedFtypes();
+  if (!ftype.length) { showError('Please select at least one facility type.'); return; }
+
+  if (!zip)    { showError('Please enter a ZIP code.'); return; }
+  if (!target) { showError('Please enter a target system name.'); return; }
+
+  resetColors();
+
+  const btn    = document.getElementById('runBtn');
+  const loader = document.getElementById('loader');
+  btn.disabled = true;
+  loader.classList.add('visible');
+
+  try {
+    let coords;
+    try { coords = await getCoords(zip); }
+    catch(e) { throw new Error('Geocoding service unreachable. (' + e.message + ')'); }
+    if (!coords) throw new Error(`ZIP "${zip}" not found.`);
+
+    let facilities;
+    try { facilities = await getFacilities(coords.lat, coords.lon, radius, ftype); }
+    catch(e) { throw new Error('Hospital data service unreachable. (' + e.message + ')'); }
+
+    // Apply embedded locations first, then check if anything exists
+    facilities = applyExcelFacilities(facilities, coords.lat, coords.lon, radius, ftype);
+
+    if (!facilities.length) {
+      showError('No facilities found. Try a larger radius or different facility type.');
+      return;
+    }
+    const systems = groupBySystem(facilities, target);
+    const targetKey = findTargetKey(systems, target);
+    lastData = { systems, target, rawFacilities: facilities };
+
+    mapInstance.setView([coords.lat, coords.lon], 11);
+    buildLegend(systems, targetKey);
+    drawMarkers(systems, targetKey);
+    buildInsights();
+    buildAccount();
+    buildAssign();
+    compFilterActive.clear();
+    compFocusModeOn = false;
+    buildCompFilterBar(systems, targetKey);
+    switchTab('insights');
+    document.getElementById('exportBtn').style.display = 'inline-block';
+
+  } catch(err) {
+    showError(err.message);
+    console.error(err);
+  } finally {
+    btn.disabled = false;
+    loader.classList.remove('visible');
+  }
+}
+
+// ════════════════════════════════════════════════════════
+//  EXPORT  (PPTX + PDF)
+// ════════════════════════════════════════════════════════
+// ── Helper: load a script dynamically and resolve when ready ─────────────────
+// ── Collect insights data ────────────────────────────────────────────────────
+function collectInsights() {
+  var systems     = lastData.systems;
+  var target      = lastData.target;
+  var targetKey   = findTargetKey(systems, target);
+  var targetFacs  = targetKey ? systems[targetKey] : [];
+  var targetCount = targetFacs.length;
+  var total       = Object.values(systems).reduce(function(a,v){return a+v.length;},0);
+  var shareP      = total>0 ? Math.round((targetCount/total)*100) : 0;
+  var competitors = Object.entries(systems)
+    .filter(function(e){return e[0]!==targetKey;})
+    .map(function(e){return {name:e[0],count:e[1].length};})
+    .sort(function(a,b){return b.count-a.count;});
+  var totalComp   = competitors.reduce(function(a,c){return a+c.count;},0);
+  var pr          = pressureRatio(targetCount, totalComp);
+  var allCompFacs = Object.entries(systems).filter(function(e){return e[0]!==targetKey;}).flatMap(function(e){return e[1];});
+  var edScore     = edExposure(allCompFacs, Object.values(systems).flat());
+  var edRating    = ratingLabel(edScore).label;
+  var leakage     = competitors.filter(function(c){return c.count>=targetCount;});
+  var allCounts   = Object.values(systems).map(function(v){return v.length;}).sort(function(a,b){return b-a;});
+  var rank        = allCounts.indexOf(targetCount)+1;
+  var position    = targetCount>=10?'Dominant':targetCount>=5?'Strong':targetCount>=2?'Moderate':'Minimal';
+  var summary     = generateSummary(targetKey, targetCount, total, shareP, pr, edScore, competitors, leakage);
+  var zipVal      = document.getElementById('zipInput').value.trim();
+  var radiusEl    = document.getElementById('radiusSelect');
+  var radiusLbl   = radiusEl.options[radiusEl.selectedIndex].text;
+  var dateStr     = new Date().toLocaleDateString('en-US',{year:'numeric',month:'long',day:'numeric'});
+  return { systems, target, targetKey, targetCount, total, shareP, competitors, pr,
+           edScore, edRating, leakage, rank, position, summary, zipVal, radiusLbl, dateStr };
+}
+
+// ── PDF Export — opens a print-ready window, user saves as PDF ───────────────
+async function exportReport() {
+  if (!lastData || !lastData.systems) { showError('Run a search first.'); return; }
+
+  var btn = document.getElementById('exportBtn');
+  btn.disabled    = true;
+  btn.textContent = '… Building';
+  clearError();
+
+  try {
+    // Capture map screenshot
+    setLoaderMsg('Capturing map…');
+    document.getElementById('loader').classList.add('visible');
+
+    var mapDataUrl = null;
+    if (typeof html2canvas !== 'undefined') {
+      try {
+        var canvas = await html2canvas(document.getElementById('map'), {
+          useCORS: true, allowTaint: true, scale: 2, logging: false
+        });
+        mapDataUrl = canvas.toDataURL('image/png');
+      } catch(e) { console.warn('Map capture failed:', e); }
+    }
+
+    document.getElementById('loader').classList.remove('visible');
+
+    var d = collectInsights();
+
+    // Build competitor table rows
+    var rows = d.competitors.slice(0, 20).map(function(c, i) {
+      var cs   = d.total>0 ? Math.round((c.count/d.total)*100)+'%' : '0%';
+      var risk = c.count >= d.targetCount ? '<span class="risk-high">HIGH</span>' : '<span class="risk-low">Low</span>';
+      return '<tr class="'+(i%2===0?'even':'odd')+'">'
+        +'<td>'+c.name+'</td>'
+        +'<td class="num">'+c.count+'</td>'
+        +'<td class="num">'+cs+'</td>'
+        +'<td class="num">'+risk+'</td>'
+        +'</tr>';
+    }).join('');
+
+    var prColor  = parseFloat(d.pr)>=4?'#e02424':parseFloat(d.pr)>=2?'#ea580c':'#1a56db';
+    var edColor  = d.edScore>=50?'#e02424':d.edScore>=25?'#ea580c':'#1a56db';
+    var lkColor  = d.leakage.length>0?'#e02424':'#1a56db';
+
+    // Build single-page landscape PDF layout
+    // Layout: slim header | 3-column body (map 44% | metrics+profile 28% | competitors 28%)
+    var topComps = d.competitors.slice(0, 10);
+    var prColor  = parseFloat(d.pr)>=4?'#e02424':parseFloat(d.pr)>=2?'#ea580c':'#1a56db';
+    var edColor  = d.edScore>=50?'#e02424':d.edScore>=25?'#ea580c':'#1a56db';
+    var lkColor  = d.leakage.length>0?'#e02424':'#1a56db';
+
+    var compRows = topComps.map(function(c,i){
+      var cs   = d.total>0?Math.round((c.count/d.total)*100)+'%':'0%';
+      var risk = c.count>=d.targetCount?'<b style="color:#e02424">HIGH</b>':'<span style="color:#16a34a">Low</span>';
+      return '<tr style="background:'+(i%2===0?'#fff':'#f5f7fa')+';-webkit-print-color-adjust:exact;print-color-adjust:exact">'
+        +'<td style="padding:3px 6px;border-bottom:1px solid #e5e7eb;font-size:7.5pt">'+c.name+'</td>'
+        +'<td style="padding:3px 6px;border-bottom:1px solid #e5e7eb;font-size:7.5pt;text-align:center">'+c.count+'</td>'
+        +'<td style="padding:3px 6px;border-bottom:1px solid #e5e7eb;font-size:7.5pt;text-align:center">'+cs+'</td>'
+        +'<td style="padding:3px 6px;border-bottom:1px solid #e5e7eb;font-size:7.5pt;text-align:center">'+risk+'</td>'
+        +'</tr>';
+    }).join('');
+
+    function metricCard(val, lbl, sub, col) {
+      return '<div style="border:1px solid #dde1e7;border-left:3px solid '+col+';border-radius:4px;padding:5px 7px;background:#fff;-webkit-print-color-adjust:exact;print-color-adjust:exact">'
+        +'<div style="font-size:15pt;font-weight:700;color:'+col+';line-height:1.1">'+val+'</div>'
+        +'<div style="font-size:6.5pt;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#374151;margin-top:1px">'+lbl+'</div>'
+        +'<div style="font-size:6.5pt;color:#6b7280">'+sub+'</div>'
+        +'</div>';
+    }
+
+    function sectionLabel(txt) {
+      return '<div style="font-size:6.5pt;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#6b7280;margin:0 0 4px;border-bottom:1px solid #e5e7eb;padding-bottom:2px">'+txt+'</div>';
+    }
+
+    function profileRow(lbl, val) {
+      return '<tr><td style="padding:3px 0;color:#6b7280;font-size:7.5pt;width:45%">'+lbl+'</td>'
+        +'<td style="padding:3px 0;font-weight:700;font-size:7.5pt">'+val+'</td></tr>';
+    }
+
+    var printHtml = '<!DOCTYPE html><html><head><meta charset="UTF-8">'
+      +'<title>CarePathIQ — '+(d.targetKey||d.target)+'</title>'
+      +'<style>'
+      +'@page{size:landscape;margin:0.35in}'
+      +'*{box-sizing:border-box;margin:0;padding:0}'
+      +'html,body{width:100%;height:100%;font-family:Arial,sans-serif;color:#1a1f2e;background:#fff}'
+      +'body{display:flex;flex-direction:column;height:100%}'
+      +'body::after{content:"CONFIDENTIAL — NOT FOR DISTRIBUTION";position:fixed;bottom:38%;left:-5%;transform:rotate(-30deg);font-size:48pt;font-weight:900;color:rgba(0,0,0,0.022);white-space:nowrap;pointer-events:none;z-index:0;letter-spacing:.04em}'
+      // Prevent any page breaks inside our layout
+      +'.no-break{page-break-inside:avoid;break-inside:avoid}'
+      +'</style></head><body>'
+
+      // ── Slim header bar ───────────────────────────────────
+      +'<div class="no-break" style="background:#1a1f2e;color:#fff;padding:6px 14px;display:flex;'
+        +'justify-content:space-between;align-items:center;border-radius:4px;margin-bottom:8px;'
+        +'-webkit-print-color-adjust:exact;print-color-adjust:exact">'
+        +'<div style="display:flex;align-items:baseline;gap:10px">'
+          +(ccLogoDataUrl ? '<img src="'+ccLogoDataUrl+'" style="height:22px;object-fit:contain;margin-right:8px;vertical-align:middle"/>' : '')
+          +'<span style="font-size:13pt;font-weight:700;color:#60a5fa">CarePathIQ</span>'
+          +'<span style="font-size:9pt;color:#cbd5e1">Market Intelligence Report</span>'
+          +'<span style="font-size:8pt;color:#94a3b8;margin-left:6px">— '+(d.targetKey||d.target)+'</span>'
+        +'</div>'
+        +'<span style="font-size:8pt;color:#6b7280">'+d.dateStr
+          +' &nbsp;|&nbsp; ZIP: '+d.zipVal
+          +' &nbsp;|&nbsp; Radius: '+d.radiusLbl
+          +' &nbsp;|&nbsp; '+d.total+' facilities'
+        +'</span>'
+      +'</div>'
+
+      // ── 3-column body ─────────────────────────────────────
+      +'<div style="display:grid;grid-template-columns:44% 1fr 1fr;gap:10px;flex:1;min-height:0">'
+
+        // COL 1: Map
+        +'<div class="no-break" style="display:flex;flex-direction:column">'
+          +(mapDataUrl
+            ? '<img src="'+mapDataUrl+'" style="width:100%;flex:1;object-fit:cover;border:1px solid #dde1e7;border-radius:4px;display:block;min-height:0"/>'
+            : '<div style="flex:1;background:#f0f2f5;border:1px solid #dde1e7;border-radius:4px;display:flex;align-items:center;justify-content:center;color:#6b7280;font-size:9pt">Map unavailable</div>')
+        +'</div>'
+
+        // COL 2: Metrics + Target Profile + Summary
+        +'<div class="no-break" style="display:flex;flex-direction:column;gap:8px">'
+
+          // 4 metric cards in 2x2 grid
+          +sectionLabel('Key Metrics')
+          +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">'
+            +metricCard(d.shareP+'%',        'Market Share',     'of total facilities',     '#1a56db')
+            +metricCard(d.pr+':1',           'Pressure Ratio',   'competitors vs target',   prColor)
+            +metricCard(d.edScore+'/100',    'ED Exposure',      d.edRating+' risk',         edColor)
+            +metricCard(d.leakage.length+'', 'Leakage Systems',  d.leakage.length>0?'exceed target':'none detected', lkColor)
+          +'</div>'
+
+          // Target profile
+          +sectionLabel('Target Profile')
+          +'<table style="width:100%;border-collapse:collapse">'
+            +profileRow('System', d.targetKey||d.target)
+            +profileRow('Facilities', String(d.targetCount))
+            +profileRow('Market Share', d.shareP+'%')
+            +profileRow('Market Rank', '#'+d.rank)
+            +profileRow('Position', d.position)
+          +'</table>'
+
+          // Summary
+          +sectionLabel('Market Summary')
+          +'<div style="background:#e8f0fe;border:1px solid #bfdbfe;border-radius:4px;padding:7px 9px;'
+            +'font-size:7pt;line-height:1.6;color:#1e3a5f;flex:1;'
+            +'-webkit-print-color-adjust:exact;print-color-adjust:exact">'
+            +d.summary
+          +'</div>'
+
+        +'</div>'
+
+        // COL 3: Competitor breakdown
+        +'<div class="no-break" style="display:flex;flex-direction:column">'
+          +sectionLabel('Competitor Breakdown')
+          +'<table style="width:100%;border-collapse:collapse">'
+            +'<thead><tr style="background:#1a1f2e;-webkit-print-color-adjust:exact;print-color-adjust:exact">'
+              +'<th style="padding:4px 6px;color:#fff;font-size:7.5pt;text-align:left;font-weight:700">Health System</th>'
+              +'<th style="padding:4px 6px;color:#fff;font-size:7.5pt;text-align:center;font-weight:700">Count</th>'
+              +'<th style="padding:4px 6px;color:#fff;font-size:7.5pt;text-align:center;font-weight:700">Share</th>'
+              +'<th style="padding:4px 6px;color:#fff;font-size:7.5pt;text-align:center;font-weight:700">Risk</th>'
+            +'</tr></thead>'
+            +'<tbody>'+compRows+'</tbody>'
+          +'</table>'
+        +'</div>'
+
+      +'</div>'
+
+      // ── Slim footer ───────────────────────────────────────
+      // Logo HTML for header
+      + (ccLogoDataUrl
+          ? '<img src="'+ccLogoDataUrl+'" style="height:22px;object-fit:contain;display:block;margin-bottom:2px"/>'
+          : '')
+
+      +'<div style="margin-top:6px;display:flex;justify-content:space-between;align-items:center;'
+        +'border-top:1px solid #e5e7eb;padding-top:5px">'
+        +'<span style="font-size:7pt;color:#9ca3af">'
+          +'Generated by CarePathIQ &nbsp;|&nbsp; Care Continuity &nbsp;|&nbsp; Confidential'
+        +'</span>'
+        +'<span style="font-size:7pt;color:#d1d5db;font-weight:600;letter-spacing:.06em;text-transform:uppercase">'
+          +'NOT FOR DISTRIBUTION'
+        +'</span>'
+      +'</div>'
+
+      +'</body></html>';
+
+    // Open in new window and trigger print dialog
+    var win = window.open('', '_blank', 'width=1200,height=850');
+    if (!win) {
+      // Popup blocked — fall back to blob download
+      var blob = new Blob([printHtml], {type:'text/html'});
+      var a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'CarePathIQ_'+(d.targetKey||d.target).replace(/[^a-z0-9]/gi,'_')+'_'+d.zipVal+'.html';
+      a.click();
+      URL.revokeObjectURL(a.href);
+      showError('Pop-up blocked — downloaded as HTML. Open the file and use File > Print > Save as PDF.');
+      return;
+    }
+
+    win.document.write(printHtml);
+    win.document.close();
+    // Small delay lets images render before print dialog opens
+    setTimeout(function() { win.focus(); win.print(); }, 800);
+
+  } catch(err) {
+    showError('Export failed: ' + err.message);
+    console.error('Export error:', err);
+  } finally {
+    btn.disabled    = false;
+    btn.textContent = '↓ Export PDF';
+    document.getElementById('loader').classList.remove('visible');
+  }
+}
+
+// ── Pin size input handler (called from slider oninput) ─────────────────────
+function onPinSizeInput(val) {
+  document.getElementById('targetPinSizeVal').textContent = val;
+  // Label updates immediately; map redraw is debounced via the input event listener
+}
+
+
+// ════════════════════════════════════════════════════════
+//  COMPETITOR FILTER / FOCUS  (compact dropdown)
+// ════════════════════════════════════════════════════════
+var compFilterActive = new Set();  // names currently checked in the dropdown
+var compFocusModeOn  = false;      // focus checkbox state
+
+// ── Open / close the dropdown ──────────────────────────────────────────────
+function toggleCompFilterMenu(e) {
+  e.stopPropagation();
+  var menu = document.getElementById('compFilterMenu');
+  var btn  = document.getElementById('compFilterBtn');
+  if (!menu) return;
+  var isOpen = menu.classList.contains('open');
+  if (isOpen) {
+    menu.classList.remove('open');
+  } else {
+    var rect = btn.getBoundingClientRect();
+    menu.style.top  = (rect.bottom + 4) + 'px';
+    menu.style.left = rect.left + 'px';
+    menu.classList.add('open');
+  }
+}
+document.addEventListener('click', function(e) {
+  var menu = document.getElementById('compFilterMenu');
+  var btn  = document.getElementById('compFilterBtn');
+  if (menu && !menu.contains(e.target) && e.target !== btn && !(btn && btn.contains(e.target))) {
+    menu.classList.remove('open');
+  }
+});
+
+// ── Build / rebuild the dropdown items ────────────────────────────────────
+function buildCompFilterBar(systems, targetKey) {
+  var wrap = document.getElementById('compFilterWrap');
+  var items = document.getElementById('compFilterItems');
+  if (!wrap || !items) return;
+
+  var sysEntries = Object.entries(systems)
+    .filter(function(e){ return e[0] !== targetKey && e[0] !== 'Independent / Community'; })
+    .sort(function(a,b){ return b[1].length - a[1].length; });
+
+  if (!sysEntries.length) { wrap.style.display = 'none'; return; }
+
+  // Remove any systems from active set that no longer exist
+  compFilterActive.forEach(function(s) {
+    if (!systems[s]) compFilterActive.delete(s);
+  });
+
+  items.innerHTML = sysEntries.map(function(e) {
+    var sys   = e[0];
+    var count = e[1].length;
+    var color = getColor(sys, targetKey);
+    var checked = compFilterActive.has(sys);
+    return '<div class="cfilter-item">'
+      + '<label>'
+      + '<input type="checkbox" value="' + sys.replace(/"/g,'&quot;') + '" '
+        + (checked ? 'checked ' : '')
+        + 'onchange="onCompFilterChange(this)"/>'
+      + '<span class="cfilter-swatch" style="background:' + color + '"></span>'
+      + sys
+      + '<span class="cfilter-count">' + count + '</span>'
+      + '</label>'
+      + '</div>';
+  }).join('');
+
+  // Sync focus checkbox
+  var focusChk = document.getElementById('compFocusChk');
+  if (focusChk) focusChk.checked = compFocusModeOn;
+
+  wrap.style.display = '';
+  updateCompFilterSummary();
+}
+
+function onCompFilterChange(chk) {
+  var sys = chk.value;
+  if (chk.checked) compFilterActive.add(sys);
+  else             compFilterActive.delete(sys);
+  updateCompFilterSummary();
+  applyCompFilter();
+}
+
+function onFocusChkChange(chk) {
+  compFocusModeOn = chk.checked;
+  applyCompFilter();
+}
+
+function setAllCompFilter(checked) {
+  compFilterActive.clear();
+  document.querySelectorAll('#compFilterItems input[type=checkbox]').forEach(function(chk) {
+    chk.checked = checked;
+    if (checked) compFilterActive.add(chk.value);
+  });
+  updateCompFilterSummary();
+  applyCompFilter();
+}
+
+function clearCompFilter() {
+  setAllCompFilter(false);
+  compFocusModeOn = false;
+  var focusChk = document.getElementById('compFocusChk');
+  if (focusChk) focusChk.checked = false;
+}
+
+function updateCompFilterSummary() {
+  var el  = document.getElementById('compFilterSummary');
+  var btn = document.getElementById('compFilterBtn');
+  if (!el) return;
+  var n = compFilterActive.size;
+  if (n === 0) {
+    el.textContent = 'All Competitors';
+    btn && btn.classList.remove('has-filter');
+  } else if (n === 1) {
+    el.textContent = [...compFilterActive][0].split(' ').slice(0,2).join(' ');
+    btn && btn.classList.add('has-filter');
+  } else {
+    el.textContent = n + ' systems';
+    btn && btn.classList.add('has-filter');
+  }
+}
+
+// applyCompFilter: dims/hides markers based on current filter state.
+// Does NOT re-query or re-group — operates purely on the existing marker layer.
+function applyCompFilter() {
+  if (!lastData || !lastData.systems) return;
+  var targetKey = findTargetKey(lastData.systems, lastData.target);
+  var hasFilter = compFilterActive.size > 0;
+
+  markers.forEach(function(marker) {
+    var sys = marker._cpiqSys;
+    if (!sys) return;
+
+    var isTarget = sys === targetKey;
+    var isSelected = compFilterActive.has(sys);
+
+    if (!hasFilter) {
+      // No filter — show everything normally
+      marker.setOpacity(1);
+      marker.getElement && marker.getElement() && (marker.getElement().style.filter = '');
+    } else if (isTarget) {
+      // Target always fully visible
+      marker.setOpacity(1);
+      marker.getElement && marker.getElement() && (marker.getElement().style.filter = '');
+    } else if (isSelected) {
+      // Selected competitor — highlight
+      marker.setOpacity(1);
+      marker.getElement && marker.getElement() && (marker.getElement().style.filter = 'drop-shadow(0 0 4px rgba(22,73,201,.6))');
+    } else {
+      // Not selected
+      if (compFocusModeOn) {
+        marker.setOpacity(0);  // hide entirely
+      } else {
+        marker.setOpacity(0.15);  // dim
+        marker.getElement && marker.getElement() && (marker.getElement().style.filter = 'grayscale(1)');
+      }
+    }
+  });
+
+  // Update insights panel to reflect filtered view if focus mode is on
+  if (compFocusModeOn && hasFilter) {
+    buildInsightsFiltered(targetKey);
+  } else {
+    buildInsights();
+  }
+}
+
+// Build insights panel scoped to selected competitors only (focus mode)
+function buildInsightsFiltered(targetKey) {
+  if (!lastData || !lastData.systems) return;
+  var systems = lastData.systems;
+
+  // Build a filtered systems view: target + selected competitors only
+  var filteredSystems = {};
+  filteredSystems[targetKey] = systems[targetKey] || [];
+  compFilterActive.forEach(function(sys) {
+    if (systems[sys]) filteredSystems[sys] = systems[sys];
+  });
+
+  // Temporarily swap lastData.systems for buildInsights rendering, then restore
+  var origSystems = lastData.systems;
+  lastData.systems = filteredSystems;
+  buildInsights();
+  lastData.systems = origSystems;
+
+  // Add a banner to the top of insights noting the filtered view
+  var insightsEl = document.getElementById('insights');
+  if (insightsEl) {
+    var banner = '<div style="background:#fef3c7;border:1px solid #fbbf24;border-radius:6px;'
+      + 'padding:7px 10px;margin-bottom:10px;font-size:11px;color:#92400e;font-weight:600">'
+      + '⊙ Focus Mode: showing ' + compFilterActive.size + ' selected competitor'
+      + (compFilterActive.size > 1 ? 's' : '') + ' vs. target'
+      + '</div>';
+    insightsEl.innerHTML = banner + insightsEl.innerHTML;
+  }
+}
+
+// ════════════════════════════════════════════════════════
+//  BOOTSTRAP
+// ════════════════════════════════════════════════════════
+function bootstrap() {
+  if (typeof L === 'undefined') {
+    showError('Leaflet failed to load. Check internet connection and refresh.');
+    return;
+  }
+  initMap();
+
+  // ── Debounced redraw helpers ────────────────────────────────────────────
+  // All pin controls use a 120ms debounce — updates the label immediately
+  // but only redraws the map after the user stops interacting.
+  // This prevents crashes when dragging over hundreds of markers.
+  var _pinRedrawTimer = null;
+  function schedulePinRedraw(resetPalette) {
+    clearTimeout(_pinRedrawTimer);
+    _pinRedrawTimer = setTimeout(function() {
+      if (!lastData || !lastData.systems) return;
+      _pinIconCache = {}; // clear icon cache so new color/size takes effect
+      if (resetPalette) resetColors();
+      var targetKey = findTargetKey(lastData.systems, lastData.target);
+      if (resetPalette) buildLegend(lastData.systems, targetKey);
+      drawMarkers(lastData.systems, targetKey);
+    }, 120);
+  }
+
+  // Pin size slider
+  document.getElementById('targetPinSize').addEventListener('input', function() {
+    document.getElementById('targetPinSizeVal').textContent = this.value;
+    schedulePinRedraw(false);
+  });
+
+  // Target color
+  document.getElementById('targetColor').addEventListener('input', function() {
+    schedulePinRedraw(true);
+  });
+
+  // Independent color
+  document.getElementById('independentColor').addEventListener('input', function() {
+    schedulePinRedraw(false);
+  });
+
+  // No auto-run — user initiates search manually
+}
+
+
+
+
+
+
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', bootstrap);
+} else {
+  bootstrap();
+}
+
+
+
+
+
+
+</script>
+</body>
+</html>
