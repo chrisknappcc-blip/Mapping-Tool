@@ -475,18 +475,7 @@ input::placeholder{color:var(--muted-2)}
 </head>
 <body>
 
-<div id="sp-warning" style="display:none;background:#fff3cd;color:#856404;
-  padding:8px 16px;font-size:12px;font-family:DM Sans,sans-serif;
-  border-bottom:1px solid #ffc107;text-align:center">
-  ⚠ For full functionality, open this file through SharePoint — not downloaded locally.
-  In SharePoint, click the file name to open it in the browser.
-</div>
-<script>
-// Show warning if opened as file:// instead of http://
-if (window.location.protocol === 'file:') {
-  document.getElementById('sp-warning').style.display = 'block';
-}
-</script>
+
 <div id="header">
   <div class="hdr-logo">
     <span class="care">Care</span><span class="path">Path</span><span class="iq">IQ</span>
@@ -542,10 +531,7 @@ if (window.location.protocol === 'file:') {
       <option value="individual" selected>Individual Locations</option>
     </select>
   </label>
-  <label style="flex-direction:row;align-items:center;gap:6px;cursor:pointer" title="NPI Registry requires a server-side proxy — unavailable in hosted mode">
-    <input type="checkbox" id="npiToggle" style="width:14px;height:14px;accent-color:var(--accent);cursor:pointer"/>
-    <span style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--muted-2);white-space:nowrap;text-decoration:line-through" title="NPI requires server proxy">NPI Data</span>
-  </label>
+
   <div class="ctrl-comp-wrap" id="compFilterWrap" style="display:none">
     <span class="ctrl-comp-lbl">Competitor Systems</span>
     <button type="button" id="compFilterBtn" onclick="toggleCompFilterMenu(event)">
