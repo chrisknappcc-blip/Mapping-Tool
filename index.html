@@ -2650,13 +2650,28 @@ async function addManualFacility() {
 // Stored imported facilities persist across sessions
 var LS_EXCEL_KEY = 'cpiq_excel_facilities';
 var excelFacilities = [];
-try {
-  var _ef = localStorage.getItem(LS_EXCEL_KEY);
-  if (_ef) excelFacilities = JSON.parse(_ef);
-} catch(e) {}
+
+// Load QHIN data from Azure Blob Storage via API
+async function loadQHINData() {
+  try {
+    setLoaderMsg('Loading QHIN facility data…');
+    var res = await fetch('/api/qhin-data');
+    if (!res.ok) {
+      console.warn('QHIN data not available: HTTP ' + res.status);
+      return;
+    }
+    var data = await res.json();
+    if (data.facilities && data.facilities.length) {
+      excelFacilities = data.facilities;
+      console.log('QHIN: loaded ' + excelFacilities.length + ' facilities from Blob Storage');
+    }
+  } catch(e) {
+    console.warn('QHIN load failed: ' + e.message);
+  }
+}
 
 function saveExcelFacilities() {
-  try { localStorage.setItem(LS_EXCEL_KEY, JSON.stringify(excelFacilities)); } catch(e) {}
+  // No-op — data is now served from Blob Storage, not localStorage
 }
 
 // Column name aliases — maps common header variations to our standard fields
@@ -3540,6 +3555,9 @@ function bootstrap() {
     return;
   }
   initMap();
+
+  // Load QHIN data in the background — ready before the user runs a search
+  loadQHINData();
 
   // ── Debounced redraw helpers ────────────────────────────────────────────
   // All pin controls use a 120ms debounce — updates the label immediately
