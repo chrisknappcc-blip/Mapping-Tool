@@ -649,7 +649,7 @@ function classifyEmbeddedType(name) {
    && !/\b(sleep center|rehab|cardiac rehab|imaging|lab|pharmacy|group|physicians|associates|clinic|cancer center|behavioral|program|network|foundation)\b/.test(n)) return 'hospital';
 
   // ── Specialist ────────────────────────────────────────────────────────────
-  if (/\b(cardiol|oncol|neurolog|orthoped|orthopaed|gastroenterol|pulmonol|rheumatol|nephrolog|urolog|endocrinol|hematol|ophthalmol|otolaryng|\bent\b|psychiatr|obstetric|gynecol|\bobgyn\b|sports medicine|spine center|spine clinic|pain management|pain center|cancer center|cancer institute|heart center|vascular surgery|thoracic surgery|bariatric|fertility|sleep medicine|allerg|immunol|dermatol|neurosurg|hand surgery|shoulder clinic|knee clinic|joint replacement|plastic surg|oral surg|colon|rectal|podiat|audiol|\biv infusion\b|wound care|sloan|farber|\bmsk\b|\bmdacc\b|kettering|\bDana.Farber\b)\b/.test(n)) return 'specialist';
+  if (/\b(cardiol|oncol|neurolog|orthoped|orthopaed|gastroenterol|pulmonol|rheumatol|nephrolog|urolog|endocrinol|hematol|otolaryng|\bent\b|obstetric|gynecol|\bobgyn\b|sports medicine|spine center|spine clinic|pain management|pain center|cancer center|cancer institute|heart center|vascular surgery|thoracic surgery|bariatric|fertility|allerg|immunol|dermatol|neurosurg|hand surgery|shoulder clinic|knee clinic|joint replacement|plastic surg|oral surg|colon|rectal|\biv infusion\b|wound care|sloan|farber|\bmsk\b|\bmdacc\b|kettering|\bDana.Farber\b)\b/.test(n)) return 'specialist';
 
   // ── Clinic / Primary Care (default for medical practices) ─────────────────
   if (/\b(primary care|family medicine|family practice|family health|internal medicine|general practice|pediatric|\bmd\b|\bdo\b|\bpa-c\b|medical group|physician group|physicians|medical associates|health clinic|community health|federally qualified|fqhc|rural health|\bva clinic\b|veterans|community clinic|neighborhood health|student health|occupational health|employee health|corporate health|telehealth|telemedicine)\b/.test(n)) return 'clinic';
@@ -1283,13 +1283,13 @@ const SPECIALIST_TAGS = new Set([
   'gastroenterology','pulmonology','rheumatology','nephrology','urology',
   'endocrinology','dermatology','hematology','infectious_disease',
   'immunology','allergy','surgery','vascular','thoracic','plastic_surgery',
-  'ophthalmology','ent','otolaryngology','pain_management','psychiatry',
+  'ent','otolaryngology','pain_management',
   'obstetrics','gynecology','obgyn','maternal_fetal','neonatology',
-  'pediatrics','geriatrics','sports_medicine','sleep_medicine','radiology',
+  'pediatrics','geriatrics','sports_medicine','radiology',
   'pathology','anesthesiology','physical_medicine','physiatry'
 ]);
 
-const SPECIALIST_NAME_RX = /(cardiol|oncol|neurolog|orthoped|orthopaed|gastro|pulmonol|rheumatol|nephrolog|urolog|endocrinol|hematol|infectious disease|immunol|allerg|vascular|thoracic|plastic surg|ophthalmol|otolaryng|pain management|psychiatr|obstetric|gynecol|ob.?gyn|maternal|neonatol|pediatric|geriatric|sports medicine|sleep medicine|radiolog|patholog|anesthesiol|physiatry|physiatrist|rehabilitation medicine|spine center|spine clinic|cancer center|cancer clinic|heart center|heart clinic|women.?s health|men.?s health|neurosurg|oral surg|hand surg|shoulder|knee clinic|joint replacement|bariatric|fertility|infertility|ivf clinic)/i;
+const SPECIALIST_NAME_RX = /\b(cardiol|oncol|neurolog|orthoped|orthopaed|gastro|pulmonol|rheumatol|nephrolog|urolog|endocrinol|hematol|infectious disease|immunol|allerg|vascular|thoracic|plastic surg|otolaryng|pain management|obstetric|gynecol|ob.?gyn|maternal|neonatol|pediatric|geriatric|sports medicine|radiolog|patholog|anesthesiol|physiatry|physiatrist|rehabilitation medicine|spine center|spine clinic|cancer center|cancer clinic|heart center|heart clinic|women.?s health|men.?s health|neurosurg|oral surg|hand surg|shoulder|knee clinic|joint replacement|bariatric|fertility|infertility|ivf clinic)\b/i;
 
 // Hard allowlist — ONLY these amenity/healthcare values are ever kept.
 // Anything without one of these is dropped (blocks building=*, leisure=*, golf=*, etc.)
@@ -1306,16 +1306,35 @@ const ALLOWED_HEALTHCARE = new Set([
 const REHAB_ALLOW_RX = /\b(rehab(ilitation)?|physical therapy|pt center|sports medicine|orthopaedic|orthopedic|spine center|pain management)\b/i;
 
 const EXCLUDE_NAME_RX = [
+  // Dental
   /\bdent(al|ist|istry)\b/i, /\orthodont/i, /\bendodont/i,
+  // Pharmacy
   /\bpharmac(y|ies|ist)\b/i, /\bdrug\s?store\b/i,
-  /\boptom(etrist|etry)\b/i, /\bophthalmol/i,
-  /\beye\s?(care|clinic|center|centre|doctor|specialist)\b/i,
-  /\bvision\s?(care|center|centre|clinic)\b/i,
+  // Eye care
+  /\boptom(etrist|etry)\b/i, /\bophthalmol/i, /\boptician\b/i,
+  /\beye\s?(care|clinic|center|centre|doctor|specialist|exam|wear)\b/i,
+  /\bvision\s?(care|center|centre|clinic|source|works)\b/i,
+  /\beyewear\b/i, /\bglasses\b/i, /\bcontact\s?lens/i,
+  // Sleep medicine
+  /\bsleep\s?(center|centre|clinic|lab|medicine|study|disorder)\b/i,
+  // Substance use / behavioral health
+  /\bsubstance\s?(use|abuse)\b/i,
+  /\baddiction\s?(center|centre|clinic|treatment|medicine|recovery)\b/i,
+  /\brecovery\s?(center|centre|clinic|house|home)\b/i,
+  /\bdetox\b/i, /\bmethadone\b/i, /\bsuboxone\b/i,
+  /\bbehavioral\s+health\b/i, /\bbehavioural\s+health\b/i,
+  /\bmental\s+health\s+(center|centre|clinic)\b/i,
+  /\bpsychiatric\s+(center|centre|clinic|hospital|unit)\b/i,
+  /\bpsychotherapy\b/i,
+  // Chiropractic
   /\bchiropract(or|ic)\b/i, /\bchiro\b/i,
+  // Child / day care
   /\bafter.?school\b/i, /\bafter.?care\b/i,
   /\bchild.?care\b/i, /\bday.?care\b/i,
   /\bpreschool\b/i, /\bkindergarten\b/i,
+  // Veterinary
   /\bveterinar(y|ian)\b/i, /\banimal\s+hospital\b/i, /\bpet\s+(clinic|hospital|care)\b/i,
+  // Wellness / non-medical
   /\bgolf\b/i, /\bspa\b/i, /\bsalon\b/i, /\bbeauty\b/i,
   /\bfitness\b/i, /\bgym\b/i, /\bpilates\b/i, /\byoga\b/i,
   /\bmassage\b/i, /\bacupuncture\b/i,
