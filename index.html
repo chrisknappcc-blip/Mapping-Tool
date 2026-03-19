@@ -2350,19 +2350,56 @@ function handleSysRename(input) {
 // ════════════════════════════════════════════════════════
 // Stores user overrides: { facilityOsmId: 'System Name' }
 // Persists to localStorage so assignments survive page reloads
-const LS_OVERRIDES_KEY   = 'cpiq_system_overrides';
-const LS_CUSTOM_SYS_KEY  = 'cpiq_custom_systems';
+// ── Shared State ─────────────────────────────────────────────────────────────
+// State is persisted in Azure Blob Storage and shared across all team members.
+// Loaded on startup, saved on every change.
 
-// User-defined system names that always appear in Assign dropdowns
 let customSystemNames = [];
-try {
-  const saved = localStorage.getItem(LS_CUSTOM_SYS_KEY);
-  if (saved) customSystemNames = JSON.parse(saved);
-} catch(e) {}
+
+var _stateSaveTimer = null;
+function scheduleSaveSharedState() {
+  clearTimeout(_stateSaveTimer);
+  _stateSaveTimer = setTimeout(saveSharedState, 1000);
+}
+
+async function loadSharedState() {
+  try {
+    var res = await fetch('/api/state-load');
+    if (!res.ok) { console.warn('State load HTTP ' + res.status); return; }
+    var state = await res.json();
+    if (state.overrides)     systemOverrides    = state.overrides;
+    if (state.customSystems) customSystemNames  = state.customSystems;
+    if (state.excluded)      _loadedExcluded    = state.excluded;
+    console.log('Shared state loaded: ' + Object.keys(systemOverrides).length + ' overrides, '
+      + customSystemNames.length + ' custom systems, '
+      + (state.excluded || []).length + ' excluded');
+  } catch(e) {
+    console.warn('Could not load shared state: ' + e.message);
+  }
+}
+
+async function saveSharedState() {
+  try {
+    var excluded = getExcluded();
+    var state = {
+      overrides:     systemOverrides,
+      customSystems: customSystemNames,
+      excluded:      [...excluded]
+    };
+    var res = await fetch('/api/state-save', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(state)
+    });
+    if (!res.ok) console.warn('State save HTTP ' + res.status);
+    else console.log('Shared state saved');
+  } catch(e) {
+    console.warn('Could not save shared state: ' + e.message);
+  }
+}
 
 function saveCustomSystems() {
-  try { localStorage.setItem(LS_CUSTOM_SYS_KEY, JSON.stringify(customSystemNames)); }
-  catch(e) {}
+  scheduleSaveSharedState();
 }
 
 function addCustomSystem(name) {
@@ -2396,14 +2433,9 @@ function renameCustomSystem(oldName, newName) {
   return true;
 }
 let systemOverrides = {};
-try {
-  const saved = localStorage.getItem(LS_OVERRIDES_KEY);
-  if (saved) systemOverrides = JSON.parse(saved);
-} catch(e) { console.warn('Could not load saved overrides:', e); }
 
 function saveOverrides() {
-  try { localStorage.setItem(LS_OVERRIDES_KEY, JSON.stringify(systemOverrides)); }
-  catch(e) { console.warn('Could not save overrides:', e); }
+  scheduleSaveSharedState();
 }
 
 function buildAssign() {
@@ -2554,18 +2586,16 @@ function buildAssign() {
     +'</div>';
 }
 
-// ── Exclude helpers (persisted in localStorage) ──────────────────────────────
-const LS_EXCLUDED_KEY = 'cpiq_excluded_facilities';
+// ── Exclude helpers (persisted in shared state) ──────────────────────────────
+var _loadedExcluded = [];
 
 function getExcluded() {
-  try {
-    const s = localStorage.getItem(LS_EXCLUDED_KEY);
-    return s ? new Set(JSON.parse(s)) : new Set();
-  } catch(e) { return new Set(); }
+  return new Set(_loadedExcluded);
 }
 
 function saveExcluded(set) {
-  try { localStorage.setItem(LS_EXCLUDED_KEY, JSON.stringify([...set])); } catch(e) {}
+  _loadedExcluded = [...set];
+  scheduleSaveSharedState();
 }
 
 function toggleExclude(fid, btn) {
@@ -3575,8 +3605,9 @@ function bootstrap() {
   }
   initMap();
 
-  // Load QHIN data in the background — ready before the user runs a search
+  // Load QHIN data and shared state in the background
   loadQHINData();
+  loadSharedState();
 
   // ── Debounced redraw helpers ────────────────────────────────────────────
   // All pin controls use a 120ms debounce — updates the label immediately
