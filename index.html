@@ -963,81 +963,69 @@ async function queryOverpass(q) {
 // Full taxonomy list: https://nucc.org/index.php/code-sets-mainmenu-41
 const NPI_TAXONOMY = {
   hospital: [
-    '282N00000X',  // General Acute Care Hospital
-    '282NC0060X',  // Critical Access Hospital
-    '282NR1301X',  // Rural Acute Care Hospital
-    '273R00000X',  // Psychiatric Hospital
-    '276400000X',  // Rehabilitation Hospital
-    '283Q00000X',  // Psychiatric Residential Treatment
-    '282NC2000X',  // Children Hospital
-    '283X00000X',  // Chronic Disease Hospital
-    '291900000X',  // Military Hospital
+    'General Acute Care Hospital',
+    'Critical Access Hospital',
+    'Rural Acute Care Hospital',
+    'Psychiatric Hospital',
+    'Rehabilitation Hospital',
+    'Childrens Hospital',
+    'Chronic Disease Hospital',
   ],
   clinic: [
-    '261QP2300X',  // Primary Care Clinic
-    '261QF0400X',  // Federally Qualified Health Center
-    '261QR1300X',  // Rural Health Clinic
-    '261QC1500X',  // Community Health Clinic
-    '261QM2500X',  // Medical Specialty Clinic
-    '261QA0600X',  // Ambulatory Family Planning Facility
-    '261QA1903X',  // Ambulatory Surgical Center
+    'Primary Care',
+    'Federally Qualified Health Center',
+    'Rural Health Clinic',
+    'Community Health Center',
+    'Medical Specialty',
+    'Clinic/Center',
   ],
   ed: [
-    '282N00000X',  // General Hospital (has ED)
-    '261QE0002X',  // Emergency Care Center (standalone ED)
-    '282NC0060X',  // Critical Access (has ED)
+    'Emergency Care',
+    'General Acute Care Hospital',
+    'Critical Access Hospital',
   ],
   outpatient: [
-    '261QA1903X',  // Ambulatory Surgical Center
-    '261QM2500X',  // Medical Specialty Clinic
-    '261QP2300X',  // Primary Care
-    '261QR0400X',  // Rehabilitation Outpatient
-    '261QI0500X',  // Infusion Therapy
-    '261QB0400X',  // Birthing Center
+    'Ambulatory Surgical',
+    'Medical Specialty',
+    'Rehabilitation',
+    'Infusion Therapy',
   ],
   rehab: [
-    '276400000X',  // Rehabilitation Hospital
-    '261QR0400X',  // Outpatient Rehabilitation
-    '315D00000X',  // Inpatient Hospice
-    '311500000X',  // Alzheimer/Dementia
-    '315P00000X',  // Inpatient Psychiatric Residential
+    'Rehabilitation Hospital',
+    'Rehabilitation',
+    'Hospice',
+    'Skilled Nursing Facility',
   ],
   urgent_care: [
-    '261QU0200X',  // Urgent Care Center
+    'Urgent Care',
   ],
   specialist: [
-    '207R00000X',  // Internal Medicine
-    '207RC0000X',  // Cardiovascular Disease
-    '207RN0300X',  // Nephrology
-    '207RP1001X',  // Pulmonary Disease
-    '207RG0100X',  // Gastroenterology
-    '207RE0101X',  // Endocrinology
-    '207RH0000X',  // Hematology
-    '207RI0200X',  // Infectious Disease
-    '207RR0500X',  // Rheumatology
-    '207Q00000X',  // Family Medicine
-    '208000000X',  // Pediatrics
-    '207P00000X',  // Emergency Medicine
-    '207T00000X',  // Neurological Surgery
-    '2084N0400X',  // Neurology
-    '207L00000X',  // Anesthesiology
-    '207N00000X',  // Dermatology
-    '207X00000X',  // Orthopaedic Surgery
-    '207Y00000X',  // Otolaryngology
-    '207V00000X',  // Obstetrics & Gynecology
-    '207W00000X',  // Ophthalmology
-    '208600000X',  // Surgery (General)
-    '208C00000X',  // Colon & Rectal Surgery
-    '208G00000X',  // Thoracic Surgery
-    '207RO0001X',  // Oncology (Medical)
-    '2086S0122X',  // Surgical Oncology
-    '2085R0001X',  // Radiation Oncology
-    '2085R0202X',  // Diagnostic Radiology
-    '207U00000X',  // Physical Medicine & Rehab
-    '2084P0800X',  // Psychiatry
-    '101YP2500X',  // Psychology
-    '363LF0000X',  // Family Practice NP
-    '363A00000X',  // Physician Assistant
+    'Internal Medicine',
+    'Cardiovascular Disease',
+    'Nephrology',
+    'Pulmonary Disease',
+    'Gastroenterology',
+    'Endocrinology',
+    'Hematology',
+    'Infectious Disease',
+    'Rheumatology',
+    'Family Medicine',
+    'Pediatrics',
+    'Neurological Surgery',
+    'Neurology',
+    'Dermatology',
+    'Orthopaedic Surgery',
+    'Otolaryngology',
+    'Obstetrics & Gynecology',
+    'Ophthalmology',
+    'General Surgery',
+    'Thoracic Surgery',
+    'Oncology',
+    'Radiation Oncology',
+    'Diagnostic Radiology',
+    'Physical Medicine & Rehabilitation',
+    'Psychiatry',
+    'Psychology',
   ]
 };
 
