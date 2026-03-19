@@ -920,7 +920,7 @@ function makeLeafletIcon(dataUrl, size) {
 
 // ── Geocoding ────────────────────────────────────────────
 async function getCoords(zip) {
-  const url = 'https://nominatim.openstreetmap.org/search?postalcode=' + encodeURIComponent(zip) + '&country=USA&format=json&limit=1';
+  const url = '/api/geocode-proxy?postalcode=' + encodeURIComponent(zip) + '&country=USA&limit=1';
   const res = await fetch(url, { headers: {'Accept-Language':'en'} });
   if (!res.ok) throw new Error('Geocoding HTTP ' + res.status);
   const data = await res.json();
@@ -1034,7 +1034,7 @@ const NPI_TAXONOMY = {
 // and filter results by distance ourselves
 async function getStateFromCoords(lat, lon) {
   try {
-    const url = 'https://nominatim.openstreetmap.org/reverse?lat=' + lat + '&lon=' + lon + '&format=json&zoom=5';
+    const url = '/api/geocode-proxy?lat=' + lat + '&lon=' + lon + '&zoom=5';
     const res = await fetch(url, { headers: {'Accept-Language':'en'} });
     if (!res.ok) return null;
     const data = await res.json();
@@ -1131,7 +1131,7 @@ function npiToFacility(npi, lat, lon, enumerationType) {
 async function geocodeAddress(addr, city, state, zip) {
   var q = [addr, city, state, zip].filter(Boolean).join(', ') + ', USA';
   try {
-    var url = 'https://nominatim.openstreetmap.org/search?q=' + encodeURIComponent(q) + '&format=json&limit=1&countrycodes=us';
+    var url = '/api/geocode-proxy?q=' + encodeURIComponent(q) + '&limit=1&countrycodes=us';
     var res = await fetch(url, { headers: {'Accept-Language':'en'} });
     if (!res.ok) return null;
     var data = await res.json();
