@@ -2,7 +2,11 @@
   "name": "carepathiq-api",
   "version": "1.0.0",
   "description": "CarePathIQ backend functions",
+  "main": "npi-proxy/index.js",
   "engines": {
     "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "@azure/functions": "^4.0.0"
   }
 }
