@@ -76,6 +76,7 @@ app.http('router', {
   methods: ['GET', 'POST'],
   authLevel: 'anonymous',
   handler: async (request, context) => {
+    try {
     const url    = new URL(request.url);
     const action = url.searchParams.get('action') || '';
     const sasToken = process.env.AZURE_STORAGE_SAS_TOKEN || '';
@@ -211,5 +212,8 @@ app.http('router', {
     }
 
     return jsonResponse(404, { error: 'Unknown action: ' + action });
+    } catch(topErr) {
+      return jsonResponse(500, { error: 'Router crash', detail: topErr.message, stack: topErr.stack });
+    }
   }
 });
