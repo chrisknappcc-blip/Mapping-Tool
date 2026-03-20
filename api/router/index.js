@@ -77,13 +77,13 @@ app.http('router', {
   authLevel: 'anonymous',
   handler: async (request, context) => {
     const url    = new URL(request.url);
-    const path   = url.pathname.replace(/^\/api\//, '');
+    const action = url.searchParams.get('action') || '';
     const sasToken = process.env.AZURE_STORAGE_SAS_TOKEN || '';
 
-    context.log('Router: ' + request.method + ' ' + path);
+    context.log('Router: ' + request.method + ' action=' + action);
 
     // ── debug ─────────────────────────────────────────────────────────────────
-    if (path === 'debug') {
+    if (action === 'debug') {
       return jsonResponse(200, {
         hasSasToken: sasToken.length > 0,
         sasLength: sasToken.length,
@@ -95,8 +95,10 @@ app.http('router', {
     }
 
     // ── npi-proxy ─────────────────────────────────────────────────────────────
-    if (path === 'npi-proxy') {
-      const qs = url.search;
+    if (action === 'npi-proxy') {
+      const npiParams = new URLSearchParams(url.searchParams);
+      npiParams.delete('action');
+      const qs = '?' + npiParams.toString();
       try {
         const data = await fetchText('https://npiregistry.cms.hhs.gov/api/' + qs);
         return { status: 200, headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }, body: data };
@@ -106,9 +108,11 @@ app.http('router', {
     }
 
     // ── geocode-proxy ─────────────────────────────────────────────────────────
-    if (path === 'geocode-proxy') {
-      const params = Object.fromEntries(url.searchParams.entries());
-      const qs2    = new URLSearchParams(params).toString() + '&format=json';
+    if (action === 'geocode-proxy') {
+      const gParams = new URLSearchParams(url.searchParams);
+      gParams.delete('action');
+      const params = Object.fromEntries(gParams.entries());
+      const qs2    = gParams.toString() + '&format=json';
       const isRev  = !!params.lat;
       const gUrl   = 'https://nominatim.openstreetmap.org/' + (isRev ? 'reverse?' : 'search?') + qs2;
       try {
@@ -120,7 +124,7 @@ app.http('router', {
     }
 
     // ── qhin-data ─────────────────────────────────────────────────────────────
-    if (path === 'qhin-data') {
+    if (action === 'qhin-data') {
       if (!sasToken) return jsonResponse(500, { error: 'SAS token not configured' });
       if (qhinCache && (Date.now() - qhinCacheTime) < CACHE_TTL) {
         return jsonResponse(200, { facilities: qhinCache, count: qhinCache.length });
@@ -136,7 +140,7 @@ app.http('router', {
     }
 
     // ── convert-qhin ──────────────────────────────────────────────────────────
-    if (path === 'convert-qhin') {
+    if (action === 'convert-qhin') {
       if (!sasToken) return jsonResponse(500, { error: 'SAS token not configured' });
       try {
         const raw     = await fetchText(getBlobUrl(sasToken, 'qhin-data', 'facilities.csv'));
@@ -180,7 +184,7 @@ app.http('router', {
     }
 
     // ── state-load ────────────────────────────────────────────────────────────
-    if (path === 'state-load') {
+    if (action === 'state-load') {
       if (!sasToken) return jsonResponse(500, { error: 'SAS token not configured' });
       try {
         const raw = await fetchText(getBlobUrl(sasToken, 'app-state', 'shared-state.json'));
@@ -194,7 +198,7 @@ app.http('router', {
     }
 
     // ── state-save ────────────────────────────────────────────────────────────
-    if (path === 'state-save') {
+    if (action === 'state-save') {
       if (!sasToken) return jsonResponse(500, { error: 'SAS token not configured' });
       try {
         const body = await request.text();
@@ -206,6 +210,6 @@ app.http('router', {
       }
     }
 
-    return jsonResponse(404, { error: 'Unknown route: ' + path });
+    return jsonResponse(404, { error: 'Unknown action: ' + action });
   }
 });
