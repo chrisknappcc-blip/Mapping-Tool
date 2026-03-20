@@ -2931,7 +2931,8 @@ function filterAssignList(query) {
 }
 
 function applyOverride(select) {
-  const fid   = parseInt(select.dataset.fid);
+  const fidRaw = select.dataset.fid;
+  const fid = isNaN(parseInt(fidRaw)) ? fidRaw : parseInt(fidRaw);
   let newSys  = select.value;
 
   if (newSys === '__custom__') {
