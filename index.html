@@ -920,7 +920,7 @@ function makeLeafletIcon(dataUrl, size) {
 
 // ── Geocoding ────────────────────────────────────────────
 async function getCoords(zip) {
-  const url = '/api/geocode-proxy?postalcode=' + encodeURIComponent(zip) + '&country=USA&limit=1';
+  const url = '/api/router?action=geocode-proxy&postalcode=' + encodeURIComponent(zip) + '&country=USA&limit=1';
   const res = await fetch(url, { headers: {'Accept-Language':'en'} });
   if (!res.ok) throw new Error('Geocoding HTTP ' + res.status);
   const data = await res.json();
@@ -1034,7 +1034,7 @@ const NPI_TAXONOMY = {
 // and filter results by distance ourselves
 async function getStateFromCoords(lat, lon) {
   try {
-    const url = '/api/geocode-proxy?lat=' + lat + '&lon=' + lon + '&zoom=5';
+    const url = '/api/router?action=geocode-proxy&lat=' + lat + '&lon=' + lon + '&zoom=5';
     const res = await fetch(url, { headers: {'Accept-Language':'en'} });
     if (!res.ok) return null;
     const data = await res.json();
@@ -1059,7 +1059,7 @@ function haversineMeters(lat1, lon1, lat2, lon2) {
 async function queryNPI(taxonomyCode, state, enumerationType, limit) {
   enumerationType = enumerationType || 'NPI-2';
   limit = limit || 200;
-  var url = '/api/npi-proxy?version=2.1'
+  var url = '/api/router?action=npi-proxy&version=2.1'
     + '&taxonomy_description=' + encodeURIComponent(taxonomyCode)
     + '&state=' + encodeURIComponent(state)
     + '&limit=' + limit
@@ -1131,7 +1131,7 @@ function npiToFacility(npi, lat, lon, enumerationType) {
 async function geocodeAddress(addr, city, state, zip) {
   var q = [addr, city, state, zip].filter(Boolean).join(', ') + ', USA';
   try {
-    var url = '/api/geocode-proxy?q=' + encodeURIComponent(q) + '&limit=1&countrycodes=us';
+    var url = '/api/router?action=geocode-proxy&q=' + encodeURIComponent(q) + '&limit=1&countrycodes=us';
     var res = await fetch(url, { headers: {'Accept-Language':'en'} });
     if (!res.ok) return null;
     var data = await res.json();
@@ -2364,7 +2364,7 @@ function scheduleSaveSharedState() {
 
 async function loadSharedState() {
   try {
-    var res = await fetch('/api/state-load');
+    var res = await fetch('/api/router?action=state-load');
     if (!res.ok) { console.warn('State load HTTP ' + res.status); return; }
     var state = await res.json();
     if (state.overrides)     systemOverrides    = state.overrides;
@@ -2386,7 +2386,7 @@ async function saveSharedState() {
       customSystems: customSystemNames,
       excluded:      [...excluded]
     };
-    var res = await fetch('/api/state-save', {
+    var res = await fetch('/api/router?action=state-save', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(state)
@@ -2704,7 +2704,7 @@ var excelFacilities = [];
 async function loadQHINData() {
   try {
     setLoaderMsg('Loading QHIN facility data…');
-    var res = await fetch('/api/qhin-data');
+    var res = await fetch('/api/router?action=qhin-data');
     if (!res.ok) {
       console.warn('QHIN data not available: HTTP ' + res.status);
       return;
