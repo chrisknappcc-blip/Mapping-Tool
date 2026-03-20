@@ -90,7 +90,7 @@ app.http('router', {
         sasLength: sasToken.length,
         nodeVersion: process.version,
         qhinCached: qhinCache ? qhinCache.length : 0,
-        path: path,
+        action: action,
         fullUrl: request.url
       });
     }
