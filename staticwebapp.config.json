@@ -1,6 +1,34 @@
 {
   "routes": [
     {
+      "route": "/api/npi-proxy*",
+      "rewrite": "/api/router/npi-proxy"
+    },
+    {
+      "route": "/api/geocode-proxy*",
+      "rewrite": "/api/router/geocode-proxy"
+    },
+    {
+      "route": "/api/qhin-data*",
+      "rewrite": "/api/router/qhin-data"
+    },
+    {
+      "route": "/api/convert-qhin*",
+      "rewrite": "/api/router/convert-qhin"
+    },
+    {
+      "route": "/api/state-load*",
+      "rewrite": "/api/router/state-load"
+    },
+    {
+      "route": "/api/state-save*",
+      "rewrite": "/api/router/state-save"
+    },
+    {
+      "route": "/api/debug*",
+      "rewrite": "/api/router/debug"
+    },
+    {
       "route": "/api/*",
       "allowedRoles": ["anonymous"]
     }
