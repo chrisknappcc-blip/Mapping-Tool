@@ -729,15 +729,11 @@ async function loadSharedLogo() {
   try {
     var res = await fetch('/api/router?action=logo-load');
     if (!res.ok) return;
-    var blob = await res.blob();
-    if (blob.size === 0) return;
-    ccLogoDataUrl = await new Promise(function(resolve) {
-      var reader = new FileReader();
-      reader.onload = function(e) { resolve(e.target.result); };
-      reader.readAsDataURL(blob);
-    });
+    var data = await res.json();
+    if (!data.dataUrl) return;
+    ccLogoDataUrl = data.dataUrl;
     var prev = document.getElementById('ccLogoPreview');
-    if (prev && ccLogoDataUrl) {
+    if (prev) {
       prev.src = ccLogoDataUrl;
       prev.style.display = 'inline-block';
     }
@@ -749,20 +745,11 @@ async function loadSharedLogo() {
 
 async function saveSharedLogo(dataUrl) {
   try {
-    // Convert data URL to blob
-    var parts = dataUrl.split(',');
-    var mime  = parts[0].match(/:(.*?);/)[1];
-    var binary = atob(parts[1]);
-    var arr = new Uint8Array(binary.length);
-    for (var i = 0; i < binary.length; i++) arr[i] = binary.charCodeAt(i);
-    var blob = new Blob([arr], { type: mime });
-
-    var formData = new FormData();
-    formData.append('logo', blob, 'logo.png');
-
+    // Send the raw data URL as text — router will decode it server-side
     var res = await fetch('/api/router?action=logo-save', {
       method: 'POST',
-      body: formData
+      headers: { 'Content-Type': 'text/plain' },
+      body: dataUrl
     });
     if (!res.ok) console.warn('Logo save HTTP ' + res.status);
     else console.log('Logo saved to shared storage');
