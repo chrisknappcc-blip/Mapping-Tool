@@ -256,19 +256,13 @@ app.http('router', {
       if (!sasToken) return jsonResponse(500, { error: 'SAS token not configured' });
       try {
         const logoUrl = 'https://carepathiqdata.blob.core.windows.net/logos/cc-logo' + sasToken;
-        const logoData = await fetchBinary(logoUrl);
-        return {
-          status: 200,
-          headers: {
-            'Content-Type': 'image/png',
-            'Access-Control-Allow-Origin': '*',
-            'Cache-Control': 'public, max-age=3600'
-          },
-          body: logoData
-        };
+        const buffer  = await fetchBinary(logoUrl);
+        if (!buffer || buffer.length === 0) return jsonResponse(200, { dataUrl: null });
+        const dataUrl = 'data:image/png;base64,' + buffer.toString('base64');
+        return jsonResponse(200, { dataUrl: dataUrl });
       } catch(err) {
         if (err.message && err.message.startsWith('404')) {
-          return { status: 200, headers: { 'Content-Type': 'image/png', 'Access-Control-Allow-Origin': '*' }, body: Buffer.alloc(0) };
+          return jsonResponse(200, { dataUrl: null });
         }
         return jsonResponse(502, { error: 'Logo load failed', detail: err.message });
       }
@@ -278,11 +272,15 @@ app.http('router', {
     if (action === 'logo-save') {
       if (!sasToken) return jsonResponse(500, { error: 'SAS token not configured' });
       try {
-        const body = await request.arrayBuffer();
-        const buffer = Buffer.from(body);
-        // Extract actual image from multipart if needed — take everything after double newline
-        const logoUrl = 'https://carepathiqdata.blob.core.windows.net/logos/cc-logo' + sasToken;
-        await putBinary(logoUrl, buffer, 'image/png');
+        const dataUrl = await request.text();
+        // Parse data URL: data:image/png;base64,XXXX
+        const matches = dataUrl.match(/^data:([^;]+);base64,(.+)$/);
+        if (!matches) return jsonResponse(400, { error: 'Invalid data URL' });
+        const mimeType = matches[1];
+        const buffer   = Buffer.from(matches[2], 'base64');
+        const logoUrl  = 'https://carepathiqdata.blob.core.windows.net/logos/cc-logo' + sasToken;
+        await putBinary(logoUrl, buffer, mimeType);
+        context.log('Logo saved: ' + buffer.length + ' bytes, type: ' + mimeType);
         return jsonResponse(200, { success: true });
       } catch(err) {
         return jsonResponse(500, { error: 'Logo save failed', detail: err.message });
