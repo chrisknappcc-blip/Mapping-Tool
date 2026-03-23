@@ -54,6 +54,46 @@ function getBlobUrl(sasToken, container, blobName) {
   return 'https://carepathiqdata.blob.core.windows.net/' + container + '/' + blobName + sasToken;
 }
 
+function fetchBinary(url) {
+  return new Promise(function(resolve, reject) {
+    https.get(url, function(res) {
+      var chunks = [];
+      res.on('data', function(chunk) { chunks.push(chunk); });
+      res.on('end', function() {
+        if (res.statusCode === 200) resolve(Buffer.concat(chunks));
+        else reject(new Error(res.statusCode + ': ' + chunks.join('').substring(0, 100)));
+      });
+    }).on('error', reject);
+  });
+}
+
+function putBinary(url, buffer, contentType) {
+  return new Promise(function(resolve, reject) {
+    const urlObj = new URL(url);
+    const options = {
+      hostname: urlObj.hostname,
+      path:     urlObj.pathname + urlObj.search,
+      method:   'PUT',
+      headers: {
+        'Content-Type':   contentType,
+        'Content-Length': buffer.length,
+        'x-ms-blob-type': 'BlockBlob'
+      }
+    };
+    const req = https.request(options, function(res) {
+      let raw = '';
+      res.on('data', function(c) { raw += c; });
+      res.on('end', function() {
+        if (res.statusCode === 200 || res.statusCode === 201) resolve();
+        else reject(new Error('PUT ' + res.statusCode + ': ' + raw.substring(0, 100)));
+      });
+    });
+    req.on('error', reject);
+    req.write(buffer);
+    req.end();
+  });
+}
+
 function parseCSVLine(line) {
   var result = [], current = '', inQuotes = false;
   for (var i = 0; i < line.length; i++) {
@@ -208,6 +248,57 @@ app.http('router', {
         return jsonResponse(200, { success: true });
       } catch(err) {
         return jsonResponse(500, { error: 'State save failed', detail: err.message });
+      }
+    }
+
+    // ── logo-load ─────────────────────────────────────────────────────────────
+    if (action === 'logo-load') {
+      if (!sasToken) return jsonResponse(500, { error: 'SAS token not configured' });
+      try {
+        const logoUrl = 'https://carepathiqdata.blob.core.windows.net/logos/cc-logo' + sasToken;
+        const logoData = await fetchBinary(logoUrl);
+        return {
+          status: 200,
+          headers: {
+            'Content-Type': 'image/png',
+            'Access-Control-Allow-Origin': '*',
+            'Cache-Control': 'public, max-age=3600'
+          },
+          body: logoData
+        };
+      } catch(err) {
+        if (err.message && err.message.startsWith('404')) {
+          return { status: 200, headers: { 'Content-Type': 'image/png', 'Access-Control-Allow-Origin': '*' }, body: Buffer.alloc(0) };
+        }
+        return jsonResponse(502, { error: 'Logo load failed', detail: err.message });
+      }
+    }
+
+    // ── logo-save ─────────────────────────────────────────────────────────────
+    if (action === 'logo-save') {
+      if (!sasToken) return jsonResponse(500, { error: 'SAS token not configured' });
+      try {
+        const body = await request.arrayBuffer();
+        const buffer = Buffer.from(body);
+        // Extract actual image from multipart if needed — take everything after double newline
+        const logoUrl = 'https://carepathiqdata.blob.core.windows.net/logos/cc-logo' + sasToken;
+        await putBinary(logoUrl, buffer, 'image/png');
+        return jsonResponse(200, { success: true });
+      } catch(err) {
+        return jsonResponse(500, { error: 'Logo save failed', detail: err.message });
+      }
+    }
+
+    // ── logo-clear ────────────────────────────────────────────────────────────
+    if (action === 'logo-clear') {
+      if (!sasToken) return jsonResponse(500, { error: 'SAS token not configured' });
+      try {
+        // Upload empty blob to overwrite
+        const logoUrl = 'https://carepathiqdata.blob.core.windows.net/logos/cc-logo' + sasToken;
+        await putBinary(logoUrl, Buffer.alloc(0), 'image/png');
+        return jsonResponse(200, { success: true });
+      } catch(err) {
+        return jsonResponse(500, { error: 'Logo clear failed', detail: err.message });
       }
     }
 
