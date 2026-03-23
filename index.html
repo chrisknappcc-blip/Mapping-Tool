@@ -1909,7 +1909,109 @@ function groupBySystem(facilities, targetInput) {
     systems[bucket].push(h);
   });
 
+  // ── Step 4: Dynamic auto-grouping ─────────────────────────────────────────
+  // Look at facilities still in "Independent / Community" and group any that
+  // share an uncommon prefix (3+ facilities with the same meaningful name start).
+  var indFacs = systems['Independent / Community'] || [];
+  if (indFacs.length > 0) {
+    var autoGroups = autoGroupByName(indFacs);
+    Object.keys(autoGroups).forEach(function(groupName) {
+      var grouped = autoGroups[groupName];
+      if (grouped.length >= 3) {
+        // Move these out of Independent into their own bucket
+        systems['Independent / Community'] = (systems['Independent / Community'] || [])
+          .filter(function(f) { return !grouped.some(function(g) { return g.id === f.id; }); });
+        if (!systems[groupName]) systems[groupName] = [];
+        systems[groupName] = systems[groupName].concat(grouped);
+      }
+    });
+    // Clean up empty Independent bucket
+    if (systems['Independent / Community'] && systems['Independent / Community'].length === 0) {
+      delete systems['Independent / Community'];
+    }
+  }
+
   return systems;
+}
+
+// ── Auto-grouping by shared name prefix ───────────────────────────────────────
+// Common generic words that should NOT trigger auto-grouping on their own
+const AUTO_GROUP_STOPWORDS = new Set([
+  'the','and','of','at','in','for','a','an',
+  'medical','health','care','center','centre','clinic','hospital',
+  'medicine','group','associates','services','system','network',
+  'practice','practices','physicians','physician','doctors','doctor',
+  'regional','community','general','national','university','institute',
+  'wellness','healthcare','specialty','specialist','specialists',
+  'new','old','north','south','east','west','central','upper','lower',
+  'saint','st','mt','mount','holy','sacred','mercy','providence',
+  'memorial','foundation','partners','alliance','integrated'
+]);
+
+function autoGroupByName(facilities) {
+  var groups = {};
+
+  facilities.forEach(function(f) {
+    var name = (f.tags && f.tags.name) ? f.tags.name : '';
+    if (!name) return;
+
+    var words = name.toLowerCase()
+      .replace(/[^a-z0-9\s]/g, ' ')
+      .split(/\s+/)
+      .filter(function(w) { return w.length > 1; });
+
+    // Try prefix lengths from 3 words down to 2
+    for (var len = Math.min(4, words.length); len >= 2; len--) {
+      var prefix = words.slice(0, len);
+
+      // Skip if ALL words are stopwords
+      var meaningfulWords = prefix.filter(function(w) { return !AUTO_GROUP_STOPWORDS.has(w); });
+      if (meaningfulWords.length === 0) continue;
+
+      // Skip if the FIRST word is a stopword — too generic
+      if (AUTO_GROUP_STOPWORDS.has(prefix[0])) continue;
+
+      // Need at least one truly distinctive word (not a stopword) in first 2 words
+      var firstTwoMeaningful = prefix.slice(0, 2).filter(function(w) { return !AUTO_GROUP_STOPWORDS.has(w); });
+      if (firstTwoMeaningful.length === 0) continue;
+
+      var key = prefix.join(' ');
+
+      // Capitalize properly for display
+      var displayName = prefix.map(function(w) {
+        return AUTO_GROUP_STOPWORDS.has(w) ? w : (w.charAt(0).toUpperCase() + w.slice(1));
+      }).join(' ');
+
+      if (!groups[displayName]) groups[displayName] = [];
+
+      // Only add if not already in a longer prefix group
+      var alreadyGrouped = Object.keys(groups).some(function(g) {
+        return g !== displayName && g.toLowerCase().startsWith(key) &&
+               groups[g].some(function(gf) { return gf.id === f.id; });
+      });
+
+      if (!alreadyGrouped) {
+        groups[displayName].push(f);
+        break; // Use the longest matching prefix
+      }
+    }
+  });
+
+  // Remove groups where facilities actually belong to a longer/more specific group
+  // Keep only the most specific match per facility
+  var finalGroups = {};
+  var assigned = new Set();
+
+  // Sort by prefix length descending — longer prefix = more specific
+  Object.keys(groups).sort(function(a, b) { return b.length - a.length; }).forEach(function(gName) {
+    var unassigned = groups[gName].filter(function(f) { return !assigned.has(f.id); });
+    if (unassigned.length >= 3) {
+      finalGroups[gName] = unassigned;
+      unassigned.forEach(function(f) { assigned.add(f.id); });
+    }
+  });
+
+  return finalGroups;
 }
 
 // ════════════════════════════════════════════════════════
