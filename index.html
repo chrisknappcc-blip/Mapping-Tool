@@ -1975,11 +1975,23 @@ function autoGroupByName(facilities) {
       var firstTwoMeaningful = prefix.slice(0, 2).filter(function(w) { return !AUTO_GROUP_STOPWORDS.has(w); });
       if (firstTwoMeaningful.length === 0) continue;
 
+      // If first word is meaningful and short (likely acronym), allow full prefix even with stopwords
+      var firstWord = prefix[0];
+      var isAcronym = firstWord.length <= 5 && /^[a-z]+$/.test(firstWord);
+      // For acronym-led names, use just the first 3 words as the key (e.g. "afc urgent care")
+      if (isAcronym && len > 3) continue; // don't use 4-word prefixes for acronyms
+
       var key = prefix.join(' ');
 
       // Capitalize properly for display
-      var displayName = prefix.map(function(w) {
-        return AUTO_GROUP_STOPWORDS.has(w) ? w : (w.charAt(0).toUpperCase() + w.slice(1));
+      // Rebuild display name from ORIGINAL facility name words, not lowercased
+      var origWords = name.split(/\s+/);
+      var displayName = prefix.map(function(w, wi) {
+        // Find the original casing for this word position
+        var orig = origWords[wi] || w;
+        // If original is all-caps and short (acronym like AFC, ER), preserve it
+        if (orig.length <= 4 && orig === orig.toUpperCase() && /^[A-Z]+$/.test(orig)) return orig;
+        return AUTO_GROUP_STOPWORDS.has(w) ? w : (orig.charAt(0).toUpperCase() + orig.slice(1).toLowerCase());
       }).join(' ');
 
       if (!groups[displayName]) groups[displayName] = [];
