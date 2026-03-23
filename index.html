@@ -1566,6 +1566,11 @@ const KNOWN_SYSTEMS = [
     'cape cod hospital','cape cod healthcare',
     'island hospital'
   ]},
+  { name: "Boston Children's", patterns: [
+    "boston children's",'boston childrens','childrens hospital boston',
+    "children's hospital boston",'bch ','bchc',
+    "boston children's primary care","boston children's specialty"
+  ]},
   { name: 'Beth Israel Lahey', patterns: [
     'beth israel deaconess','bidmc','beth israel medical',
     'lahey hospital','lahey clinic','lahey health',
@@ -1843,6 +1848,12 @@ function groupBySystem(facilities, targetInput) {
     const name    = (npiOrg.length > rawName.length) ? npiOrg : rawName;
     const nameLow = name.toLowerCase();
     let bucket    = null;
+
+    // ── Step -1: Check saved overrides by stable key (highest priority) ──────
+    var stableKey = overrideKey(h);
+    if (systemOverrides[stableKey]) {
+      bucket = systemOverrides[stableKey];
+    }
 
     // ── Step 0: Use authoritative domain attribution from embedded data ──────
     // This is the most reliable signal — the endpoint domain identifies
@@ -3051,6 +3062,16 @@ function filterAssignList(query) {
   });
 }
 
+// Generate a stable key for overrides based on name + rounded coordinates
+// This ensures the same real-world facility always gets the same key
+// regardless of which data source found it or what ID it was assigned
+function overrideKey(fac) {
+  var name = ((fac.tags && fac.tags.name) || '').toLowerCase().trim();
+  var lat  = fac.lat  ? fac.lat.toFixed(3)  : '0';
+  var lon  = fac.lon  ? fac.lon.toFixed(3)  : '0';
+  return name + '|' + lat + '|' + lon;
+}
+
 function applyOverride(select) {
   const fidRaw = select.dataset.fid;
   const fid = isNaN(parseInt(fidRaw)) ? fidRaw : parseInt(fidRaw);
@@ -3063,8 +3084,17 @@ function applyOverride(select) {
   }
   select.dataset.prev = newSys;
 
-  // Store override and rebuild grouping from scratch
-  systemOverrides[fid] = newSys;
+  // Store override by stable key (name+coords) for persistence across searches
+  // Also store by ID for immediate application in current session
+  const fac = lastData && lastData.rawFacilities
+    ? lastData.rawFacilities.find(function(f) { return f.id === fid || String(f.id) === String(fid); })
+    : null;
+  if (fac) {
+    const stableKey = overrideKey(fac);
+    systemOverrides[stableKey] = newSys;
+  } else {
+    systemOverrides[fid] = newSys;
+  }
   saveOverrides();
   rebuildFromOverrides();
 }
@@ -3087,20 +3117,29 @@ function rebuildFromOverrides() {
 
   const newSystems = groupBySystem(activeFacs, lastData.target);
 
-  // Apply overrides on top
-  Object.entries(systemOverrides).forEach(function([fidStr, newSys]) {
-    const fid = isNaN(parseInt(fidStr)) ? fidStr : parseInt(fidStr);
+  // Apply overrides on top — match by stable key (name+coords) or legacy ID
+  Object.entries(systemOverrides).forEach(function([keyStr, newSys]) {
+    // Find the facility — try stable key match first, then legacy ID match
+    var fac = lastData.rawFacilities.find(function(f) {
+      return overrideKey(f) === keyStr;
+    });
+    if (!fac) {
+      // Legacy fallback: try matching by numeric or string ID
+      const fid = isNaN(parseInt(keyStr)) ? keyStr : parseInt(keyStr);
+      fac = lastData.rawFacilities.find(function(f){ return f.id === fid || String(f.id) === String(fid); });
+    }
+    if (!fac) return; // facility not in current search results
+
     // Remove from current bucket
     Object.entries(newSystems).forEach(function([sys, facs]) {
-      const idx = facs.findIndex(function(f){ return f.id === fid; });
+      const idx = facs.findIndex(function(f){ return f.id === fac.id; });
       if (idx !== -1) {
         facs.splice(idx, 1);
         if (facs.length === 0) delete newSystems[sys];
       }
     });
     // Add to new bucket
-    const fac = lastData.rawFacilities.find(function(f){ return f.id === fid; });
-    if (fac && !excluded.has(fac.id) && !excluded.has(String(fac.id))) {
+    if (!excluded.has(fac.id) && !excluded.has(String(fac.id))) {
       if (!newSystems[newSys]) newSystems[newSys] = [];
       newSystems[newSys].push(fac);
     }
