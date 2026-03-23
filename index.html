@@ -724,17 +724,52 @@ async function loadCMSData() {
 const customIcons = { target: null, competitor: null };
 // Care Continuity logo for PDF export — persisted across sessions
 let ccLogoDataUrl = null;
-try {
-  const savedLogo = localStorage.getItem('cpiq_cc_logo');
-  if (savedLogo) {
-    ccLogoDataUrl = savedLogo;
-    // Restore preview after DOM ready
-    window.addEventListener('DOMContentLoaded', function() {
-      var prev = document.getElementById('ccLogoPreview');
-      if (prev && ccLogoDataUrl) { prev.src = ccLogoDataUrl; prev.style.display = 'inline-block'; }
+
+async function loadSharedLogo() {
+  try {
+    var res = await fetch('/api/router?action=logo-load');
+    if (!res.ok) return;
+    var blob = await res.blob();
+    if (blob.size === 0) return;
+    ccLogoDataUrl = await new Promise(function(resolve) {
+      var reader = new FileReader();
+      reader.onload = function(e) { resolve(e.target.result); };
+      reader.readAsDataURL(blob);
     });
+    var prev = document.getElementById('ccLogoPreview');
+    if (prev && ccLogoDataUrl) {
+      prev.src = ccLogoDataUrl;
+      prev.style.display = 'inline-block';
+    }
+    console.log('Logo loaded from shared storage');
+  } catch(e) {
+    console.warn('Could not load shared logo: ' + e.message);
   }
-} catch(e) {}
+}
+
+async function saveSharedLogo(dataUrl) {
+  try {
+    // Convert data URL to blob
+    var parts = dataUrl.split(',');
+    var mime  = parts[0].match(/:(.*?);/)[1];
+    var binary = atob(parts[1]);
+    var arr = new Uint8Array(binary.length);
+    for (var i = 0; i < binary.length; i++) arr[i] = binary.charCodeAt(i);
+    var blob = new Blob([arr], { type: mime });
+
+    var formData = new FormData();
+    formData.append('logo', blob, 'logo.png');
+
+    var res = await fetch('/api/router?action=logo-save', {
+      method: 'POST',
+      body: formData
+    });
+    if (!res.ok) console.warn('Logo save HTTP ' + res.status);
+    else console.log('Logo saved to shared storage');
+  } catch(e) {
+    console.warn('Could not save shared logo: ' + e.message);
+  }
+}
 
 const SYSTEM_COLORS = ['#2563eb','#16a34a','#9333ea','#ea580c','#0891b2','#be185d','#854d0e','#374151','#0d9488','#7c3aed'];
 const colorMap = {};
@@ -806,21 +841,23 @@ function handleLogoUpload(e) {
   const reader = new FileReader();
   reader.onload = ev => {
     ccLogoDataUrl = ev.target.result;
-    try { localStorage.setItem('cpiq_cc_logo', ccLogoDataUrl); } catch(err) {}
     const prev = document.getElementById('ccLogoPreview');
     prev.src = ccLogoDataUrl;
     prev.style.display = 'inline-block';
+    saveSharedLogo(ccLogoDataUrl);
   };
   reader.readAsDataURL(file);
 }
 
 function clearLogo() {
   ccLogoDataUrl = null;
-  try { localStorage.removeItem('cpiq_cc_logo'); } catch(err) {}
   document.getElementById('ccLogoUpload').value = '';
   const prev = document.getElementById('ccLogoPreview');
   prev.src = '';
   prev.style.display = 'none';
+  // Clear from shared storage
+  fetch('/api/router?action=logo-clear', { method: 'POST' })
+    .catch(function(e) { console.warn('Logo clear failed: ' + e.message); });
 }
 
 function clearIcon(which) {
@@ -3766,9 +3803,10 @@ function bootstrap() {
   }
   initMap();
 
-  // Load QHIN data and shared state in the background
+  // Load QHIN data, shared state and logo in the background
   loadQHINData();
   loadSharedState();
+  loadSharedLogo();
 
   // ── Debounced redraw helpers ────────────────────────────────────────────
   // All pin controls use a 120ms debounce — updates the label immediately
