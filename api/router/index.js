@@ -254,9 +254,11 @@ app.http('router', {
     // ── icon-load ─────────────────────────────────────────────────────────────
     if (action === 'icon-load') {
       if (!sasToken) return jsonResponse(500, { error: 'SAS token not configured' });
+      const system = url.searchParams.get('system') || 'default';
+      const blobName = 'icon-' + system.replace(/[^a-z0-9-]/g, '_');
       try {
-        const url    = 'https://carepathiqdata.blob.core.windows.net/logos/target-icon' + sasToken;
-        const buffer = await fetchBinary(url);
+        const iconUrl = 'https://carepathiqdata.blob.core.windows.net/logos/' + blobName + sasToken;
+        const buffer  = await fetchBinary(iconUrl);
         if (!buffer || buffer.length === 0) return jsonResponse(200, { dataUrl: null });
         const dataUrl = 'data:image/png;base64,' + buffer.toString('base64');
         return jsonResponse(200, { dataUrl: dataUrl });
@@ -269,14 +271,16 @@ app.http('router', {
     // ── icon-save ─────────────────────────────────────────────────────────────
     if (action === 'icon-save') {
       if (!sasToken) return jsonResponse(500, { error: 'SAS token not configured' });
+      const system = url.searchParams.get('system') || 'default';
+      const blobName = 'icon-' + system.replace(/[^a-z0-9-]/g, '_');
       try {
         const dataUrl = await request.text();
         const matches = dataUrl.match(/^data:([^;]+);base64,(.+)$/s);
         if (!matches) return jsonResponse(400, { error: 'Invalid data URL', start: dataUrl.substring(0, 50) });
         const buffer  = Buffer.from(matches[2], 'base64');
-        const url     = 'https://carepathiqdata.blob.core.windows.net/logos/target-icon' + sasToken;
-        await putBinary(url, buffer, matches[1]);
-        return jsonResponse(200, { success: true, bytes: buffer.length });
+        const iconUrl = 'https://carepathiqdata.blob.core.windows.net/logos/' + blobName + sasToken;
+        await putBinary(iconUrl, buffer, matches[1]);
+        return jsonResponse(200, { success: true, bytes: buffer.length, system: system });
       } catch(err) {
         return jsonResponse(500, { error: 'Icon save failed', detail: err.message });
       }
@@ -285,9 +289,11 @@ app.http('router', {
     // ── icon-clear ────────────────────────────────────────────────────────────
     if (action === 'icon-clear') {
       if (!sasToken) return jsonResponse(500, { error: 'SAS token not configured' });
+      const system = url.searchParams.get('system') || 'default';
+      const blobName = 'icon-' + system.replace(/[^a-z0-9-]/g, '_');
       try {
-        const url = 'https://carepathiqdata.blob.core.windows.net/logos/target-icon' + sasToken;
-        await putBinary(url, Buffer.alloc(0), 'image/png');
+        const iconUrl = 'https://carepathiqdata.blob.core.windows.net/logos/' + blobName + sasToken;
+        await putBinary(iconUrl, Buffer.alloc(0), 'image/png');
         return jsonResponse(200, { success: true });
       } catch(err) {
         return jsonResponse(500, { error: 'Icon clear failed', detail: err.message });
