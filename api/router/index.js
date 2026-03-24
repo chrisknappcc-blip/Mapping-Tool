@@ -251,6 +251,49 @@ app.http('router', {
       }
     }
 
+    // ── icon-load ─────────────────────────────────────────────────────────────
+    if (action === 'icon-load') {
+      if (!sasToken) return jsonResponse(500, { error: 'SAS token not configured' });
+      try {
+        const url    = 'https://carepathiqdata.blob.core.windows.net/logos/target-icon' + sasToken;
+        const buffer = await fetchBinary(url);
+        if (!buffer || buffer.length === 0) return jsonResponse(200, { dataUrl: null });
+        const dataUrl = 'data:image/png;base64,' + buffer.toString('base64');
+        return jsonResponse(200, { dataUrl: dataUrl });
+      } catch(err) {
+        if (err.message && err.message.startsWith('404')) return jsonResponse(200, { dataUrl: null });
+        return jsonResponse(502, { error: 'Icon load failed', detail: err.message });
+      }
+    }
+
+    // ── icon-save ─────────────────────────────────────────────────────────────
+    if (action === 'icon-save') {
+      if (!sasToken) return jsonResponse(500, { error: 'SAS token not configured' });
+      try {
+        const dataUrl = await request.text();
+        const matches = dataUrl.match(/^data:([^;]+);base64,(.+)$/s);
+        if (!matches) return jsonResponse(400, { error: 'Invalid data URL', start: dataUrl.substring(0, 50) });
+        const buffer  = Buffer.from(matches[2], 'base64');
+        const url     = 'https://carepathiqdata.blob.core.windows.net/logos/target-icon' + sasToken;
+        await putBinary(url, buffer, matches[1]);
+        return jsonResponse(200, { success: true, bytes: buffer.length });
+      } catch(err) {
+        return jsonResponse(500, { error: 'Icon save failed', detail: err.message });
+      }
+    }
+
+    // ── icon-clear ────────────────────────────────────────────────────────────
+    if (action === 'icon-clear') {
+      if (!sasToken) return jsonResponse(500, { error: 'SAS token not configured' });
+      try {
+        const url = 'https://carepathiqdata.blob.core.windows.net/logos/target-icon' + sasToken;
+        await putBinary(url, Buffer.alloc(0), 'image/png');
+        return jsonResponse(200, { success: true });
+      } catch(err) {
+        return jsonResponse(500, { error: 'Icon clear failed', detail: err.message });
+      }
+    }
+
     // ── logo-load ─────────────────────────────────────────────────────────────
     if (action === 'logo-load') {
       if (!sasToken) return jsonResponse(500, { error: 'SAS token not configured' });
@@ -273,16 +316,23 @@ app.http('router', {
       if (!sasToken) return jsonResponse(500, { error: 'SAS token not configured' });
       try {
         const dataUrl = await request.text();
-        // Parse data URL: data:image/png;base64,XXXX
-        const matches = dataUrl.match(/^data:([^;]+);base64,(.+)$/);
-        if (!matches) return jsonResponse(400, { error: 'Invalid data URL' });
+        context.log('Logo save received: ' + dataUrl.length + ' chars, starts with: ' + dataUrl.substring(0, 50));
+        const matches = dataUrl.match(/^data:([^;]+);base64,(.+)$/s);
+        if (!matches) {
+          return jsonResponse(400, { 
+            error: 'Invalid data URL', 
+            received_length: dataUrl.length,
+            received_start: dataUrl.substring(0, 100)
+          });
+        }
         const mimeType = matches[1];
         const buffer   = Buffer.from(matches[2], 'base64');
+        context.log('Logo buffer: ' + buffer.length + ' bytes, mime: ' + mimeType);
         const logoUrl  = 'https://carepathiqdata.blob.core.windows.net/logos/cc-logo' + sasToken;
         await putBinary(logoUrl, buffer, mimeType);
-        context.log('Logo saved: ' + buffer.length + ' bytes, type: ' + mimeType);
-        return jsonResponse(200, { success: true });
+        return jsonResponse(200, { success: true, bytes: buffer.length, mime: mimeType });
       } catch(err) {
+        context.log.error('Logo save error: ' + err.message);
         return jsonResponse(500, { error: 'Logo save failed', detail: err.message });
       }
     }
