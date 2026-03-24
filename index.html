@@ -2570,6 +2570,7 @@ async function loadSharedState() {
     if (!res.ok) { console.warn('State load HTTP ' + res.status); return; }
     var state = await res.json();
     if (state.overrides)     systemOverrides    = state.overrides;
+    if (state.typeOverrides) typeOverrides      = state.typeOverrides;
     if (state.customSystems) customSystemNames  = state.customSystems;
     if (state.excluded)      _loadedExcluded    = state.excluded;
     console.log('Shared state loaded: ' + Object.keys(systemOverrides).length + ' overrides, '
@@ -2585,6 +2586,7 @@ async function saveSharedState() {
     var excluded = getExcluded();
     var state = {
       overrides:     systemOverrides,
+      typeOverrides: typeOverrides,
       customSystems: customSystemNames,
       excluded:      [...excluded]
     };
@@ -2635,6 +2637,7 @@ function renameCustomSystem(oldName, newName) {
   return true;
 }
 let systemOverrides = {};
+let typeOverrides = {};  // stable key -> facility type
 
 function saveOverrides() {
   scheduleSaveSharedState();
@@ -2705,6 +2708,22 @@ function buildAssign() {
             +(s===targetKey?' style="font-weight:700"':'')+'>'+s+'</option>';
         }).join('') + '<option value="__custom__">— Custom name —</option>';
 
+        // Get current facility type from overrides or auto-classification
+        var facObj = lastData && lastData.rawFacilities
+          ? lastData.rawFacilities.find(function(rf) { return rf.id === f.id || String(rf.id) === String(f.id); })
+          : null;
+        var stableKey = facObj ? overrideKey(facObj) : String(f.id);
+        var currentType = typeOverrides[stableKey]
+          || (facObj && facObj._facType)
+          || 'clinic';
+        var typeOpts = '<option value="hospital"'+(currentType==='hospital'?' selected':'')+'>Hospital</option>'
+          +'<option value="clinic"'+(currentType==='clinic'?' selected':'')+'>Clinic</option>'
+          +'<option value="ed"'+(currentType==='ed'?' selected':'')+'>ED</option>'
+          +'<option value="urgent_care"'+(currentType==='urgent_care'?' selected':'')+'>Urgent Care</option>'
+          +'<option value="rehab"'+(currentType==='rehab'?' selected':'')+'>Rehab / SNF</option>'
+          +'<option value="outpatient"'+(currentType==='outpatient'?' selected':'')+'>Outpatient</option>'
+          +'<option value="specialist"'+(currentType==='specialist'?' selected':'')+'>Specialist</option>';
+
         return '<div class="assign-row" data-name="'+f.name.toLowerCase()+'" '
           +'style="padding:5px 0;border-bottom:1px solid var(--border);'+rowStyle+'">'
           +'<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:4px">'
@@ -2719,11 +2738,19 @@ function buildAssign() {
               +'</button>'
             +'</div>'
           +'</div>'
-          +'<select data-fid="'+f.id+'" onchange="applyOverride(this)" '
-            +'style="width:100%;margin-top:3px;font-size:11px;padding:3px 5px;'
-            +'border:1px solid var(--border);border-radius:4px;background:var(--bg);color:var(--text)">'
-            +sysOpts
-          +'</select>'
+          +'<div style="display:flex;gap:4px;margin-top:3px">'
+            +'<select data-fid="'+f.id+'" onchange="applyOverride(this)" '
+              +'style="flex:2;font-size:11px;padding:3px 5px;'
+              +'border:1px solid var(--border);border-radius:4px;background:var(--bg);color:var(--text)">'
+              +sysOpts
+            +'</select>'
+            +'<select data-fid="'+f.id+'" onchange="applyTypeOverride(this)" '
+              +'style="flex:1;font-size:11px;padding:3px 5px;'
+              +'border:1px solid var(--border);border-radius:4px;background:var(--bg);color:var(--text)" '
+              +'title="Facility Type">'
+              +typeOpts
+            +'</select>'
+          +'</div>'
           +'</div>';
       }).join('')
     +'</div>'
@@ -3108,6 +3135,12 @@ function applyExcelFacilities(rawFacilities, centerLat, centerLon, radiusMeters,
     return haversineMeters(centerLat, centerLon, ef.lat, ef.lon) <= (radiusMeters || 40000);
   });
 
+  // Apply persisted type overrides to QHIN facilities before filtering
+  inRadius.forEach(function(ef) {
+    var key = overrideKey(ef);
+    if (typeOverrides[key]) ef._facType = typeOverrides[key];
+  });
+
   // Apply name-based exclusion to QHIN facilities
   // (they bypass shouldExclude since they're pre-vetted, but we still need to filter junk)
   var inRadiusFiltered = inRadius.filter(function(ef) {
@@ -3180,8 +3213,29 @@ function applyOverride(select) {
   rebuildFromOverrides();
 }
 
+function applyTypeOverride(select) {
+  const fidRaw = select.dataset.fid;
+  const fid    = isNaN(parseInt(fidRaw)) ? fidRaw : parseInt(fidRaw);
+  const newType = select.value;
+
+  const fac = lastData && lastData.rawFacilities
+    ? lastData.rawFacilities.find(function(f) { return f.id === fid || String(f.id) === String(fid); })
+    : null;
+
+  if (fac) {
+    const stableKey = overrideKey(fac);
+    typeOverrides[stableKey] = newType;
+    // Also update the in-memory facility so it takes effect immediately
+    fac._facType = newType;
+  } else {
+    typeOverrides[fidRaw] = newType;
+  }
+  saveOverrides();
+}
+
 function clearAllOverrides() {
   Object.keys(systemOverrides).forEach(k => delete systemOverrides[k]);
+  Object.keys(typeOverrides).forEach(k => delete typeOverrides[k]);
   saveOverrides();
   rebuildFromOverrides();
 }
