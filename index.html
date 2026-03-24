@@ -721,35 +721,56 @@ const customIcons = { target: null, competitor: null };
 // Care Continuity logo for PDF export — persisted across sessions
 let ccLogoDataUrl = null;
 
-async function loadSharedIcon() {
+// Load the icon for a specific health system by name
+async function loadIconForSystem(systemName) {
+  if (!systemName) return;
   try {
-    var res = await fetch('/api/router?action=icon-load');
+    var key = encodeURIComponent(systemName.toLowerCase().trim());
+    var res = await fetch('/api/router?action=icon-load&system=' + key);
     if (!res.ok) return;
     var data = await res.json();
-    if (!data.dataUrl) return;
+    if (!data.dataUrl) {
+      // No icon saved for this system — clear any previous icon
+      customIcons.target = null;
+      var prev = document.getElementById('targetIconPreview');
+      if (prev) { prev.src = ''; prev.style.display = 'none'; }
+      return;
+    }
     customIcons.target = data.dataUrl;
     var prev = document.getElementById('targetIconPreview');
     if (prev) { prev.src = data.dataUrl; prev.style.display = 'inline-block'; }
-    console.log('Target icon loaded from shared storage');
+    console.log('Icon loaded for system: ' + systemName);
   } catch(e) {
-    console.warn('Could not load shared icon: ' + e.message);
+    console.warn('Could not load icon for ' + systemName + ': ' + e.message);
   }
 }
 
+// Save the current icon for the currently typed target system
 async function saveSharedIcon(dataUrl) {
+  var systemName = document.getElementById('targetInput')
+    ? document.getElementById('targetInput').value.trim()
+    : '';
+  if (!systemName) {
+    console.warn('No target system typed — cannot save icon');
+    return;
+  }
   try {
-    var res = await fetch('/api/router?action=icon-save', {
+    var key = encodeURIComponent(systemName.toLowerCase().trim());
+    var res = await fetch('/api/router?action=icon-save&system=' + key, {
       method: 'POST',
       headers: { 'Content-Type': 'text/plain' },
       body: dataUrl
     });
     var result = await res.json();
     if (!res.ok) console.warn('Icon save failed:', result);
-    else console.log('Target icon saved to shared storage:', result);
+    else console.log('Icon saved for system: ' + systemName, result);
   } catch(e) {
-    console.warn('Could not save shared icon: ' + e.message);
+    console.warn('Could not save icon: ' + e.message);
   }
 }
+
+// Legacy — called on bootstrap, now a no-op since icons load per-search
+function loadSharedIcon() { /* icons now load per system in runSearch */ }
 
 async function loadSharedLogo() {
   try {
@@ -883,7 +904,11 @@ function clearIcon(which) {
   prev.src = '';
   prev.style.display = 'none';
   if (which === 'target') {
-    fetch('/api/router?action=icon-clear', { method: 'POST' })
+    var systemName = document.getElementById('targetInput')
+      ? document.getElementById('targetInput').value.trim()
+      : '';
+    var key = encodeURIComponent(systemName.toLowerCase().trim());
+    fetch('/api/router?action=icon-clear&system=' + key, { method: 'POST' })
       .catch(function(e) { console.warn('Icon clear failed: ' + e.message); });
   }
 }
@@ -3394,6 +3419,9 @@ async function runSearch() {
   if (!target) { showError('Please enter a target system name.'); return; }
 
   resetColors();
+
+  // Load icon for this target system (silently, in background)
+  loadIconForSystem(target);
 
   const btn    = document.getElementById('runBtn');
   const loader = document.getElementById('loader');
