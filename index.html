@@ -629,34 +629,30 @@ function classifyEmbeddedType(name) {
 
   // ── Emergency / ED ────────────────────────────────────────────────────────
   if (/\bemergency (care center|department|dept|room|services)\b/.test(n)
-   || /\b(emergency center|freestanding ed|stand-alone ed)\b/.test(n)) return 'ed';
+   || /\b(emergency center|freestanding ed|stand-alone ed|emergency medicine)\b/.test(n)) return 'ed';
 
   // ── Urgent Care ───────────────────────────────────────────────────────────
-  if (/\b(urgent care|walk-?in clinic|express care|immediate care|quick care|same.?day clinic|breeze urgent)\b/.test(n)) return 'urgent_care';
+  if (/\b(urgent care|walk-?in clinic|express care|immediate care|quick care|same.?day clinic|afc urgent|concentra|medexpress|minuteclinic|cvs minute|nextcare|gohealth|fastmed|statcare|first med|after hours)\b/.test(n)) return 'urgent_care';
 
-  // ── Rehab / Long-Term Care ────────────────────────────────────────────────
-  if (/\b(skilled nursing|nursing home|nursing facility|snf|long.?term care|hospice|inpatient rehab|acute rehab|rehabilitation hospital|rehab hospital|physical therapy center|physical therapy clinic|\bpt clinic\b|occupational therapy center|speech therapy center|cardiac rehab|cardiac rehabilitation|rehab network|rehabilitation network|physical therapy.*rehab|rehab.*physical therapy|\brehabilitation\b.*\bnetwork\b)\b/.test(n)
+  // ── Rehab / Long-Term Care / SNF ─────────────────────────────────────────
+  if (/\b(skilled nursing|nursing home|nursing facility|nursing center|\bsnf\b|long.?term care|\bltc\b|hospice|inpatient rehab|acute rehab|rehabilitation hospital|rehab hospital|physical therapy center|physical therapy clinic|\bpt clinic\b|occupational therapy|speech therapy|cardiac rehab|cardiac rehabilitation|spaulding|kindred|encompass health|select medical|brooks rehab|vibra|lifecare)\b/.test(n)
    || (/\b(physical therapy|rehabilitation|rehab)\b/.test(n) && !/\bhospital\b/.test(n))) return 'rehab';
 
   // ── Outpatient Procedure / Diagnostic ────────────────────────────────────
-  if (/\b(imaging center|radiology center|diagnostic center|infusion center|dialysis center|ambulatory surgery|ambulatory surgical|surgery center|surgical center|outpatient surgery|day surgery|endoscopy center|colonoscopy center|\bcath lab\b)\b/.test(n)) return 'outpatient';
+  if (/\b(imaging center|imaging group|radiology center|diagnostic center|infusion center|infusion therapy|dialysis center|dialysis clinic|\bdavita\b|\bfresenius\b|ambulatory surgery|ambulatory surgical|surgery center|surgical center|outpatient surgery|day surgery|endoscopy center|colonoscopy center|\bcath lab\b|radiation oncology|cancer center|cancer institute|proton therapy|\bimrt\b)\b/.test(n)) return 'outpatient';
 
   // ── Hospital — must be a standalone inpatient facility ───────────────────
-  // Name must END with hospital, or be "X Hospital" not "Hospital Y Clinic"
-  // Explicitly exclude sub-programs named after the hospital system
   if (/\bhospital\b/.test(n)
-   && !/\b(hospital (sleep|cardiac rehab|rehabilitation network|multi-specialty|transplant|comprehensive|behavioral|radiology|imaging|lab|pharmacy|group|physicians|associates|clinic|center|department|program|services|outpatient|network|cancer|home|visiting|foundation|auxiliary))\b/.test(n)
-   && !/\b(sleep center|rehab|cardiac rehab|imaging|lab|pharmacy|group|physicians|associates|clinic|cancer center|behavioral|program|network|foundation)\b/.test(n)) return 'hospital';
+   && !/\b(hospital (sleep|cardiac rehab|rehabilitation network|multi-specialty|transplant|comprehensive|behavioral|radiology|imaging|lab|pharmacy|group|physicians|associates|clinic|center|department|program|services|outpatient|network|cancer|home|visiting|foundation|auxiliary|at home))\b/.test(n)
+   && !/\b(sleep center|rehab|cardiac rehab|imaging|lab|pharmacy|group|physicians|associates|clinic|cancer center|behavioral|program|network|foundation|home health|home care)\b/.test(n)) return 'hospital';
 
   // ── Specialist ────────────────────────────────────────────────────────────
-  if (/\b(cardiol|oncol|neurolog|orthoped|orthopaed|gastroenterol|pulmonol|rheumatol|nephrolog|urolog|endocrinol|hematol|otolaryng|\bent\b|obstetric|gynecol|\bobgyn\b|sports medicine|spine center|spine clinic|pain management|pain center|cancer center|cancer institute|heart center|vascular surgery|thoracic surgery|bariatric|fertility|allerg|immunol|dermatol|neurosurg|hand surgery|shoulder clinic|knee clinic|joint replacement|plastic surg|oral surg|colon|rectal|\biv infusion\b|wound care|sloan|farber|\bmsk\b|\bmdacc\b|kettering|\bDana.Farber\b)\b/.test(n)) return 'specialist';
+  if (/\b(cardiol|oncol|neurolog|orthoped|orthopaed|gastroenterol|gastro|pulmonol|rheumatol|nephrolog|urolog|endocrinol|hematol|otolaryng|\bent\b|obstetric|gynecol|\bobgyn\b|maternal|sports medicine|spine center|spine clinic|spine care|pain management|pain center|pain care|cancer center|cancer institute|heart center|heart care|cardiac care|vascular surgery|vascular care|thoracic surgery|bariatric|weight loss surgery|fertility|reproductive|allerg|immunol|dermatol|neurosurg|hand surgery|shoulder clinic|knee clinic|joint replacement|joint care|plastic surg|oral surg|oral maxillo|colon|rectal|\biv infusion\b|wound care|wound healing|sloan|farber|\bmsk\b|\bmdacc\b|kettering|dana.farber|infectious disease|podiat)\b/.test(n)) return 'specialist';
 
-  // ── Clinic / Primary Care (default for medical practices) ─────────────────
-  if (/\b(primary care|family medicine|family practice|family health|internal medicine|general practice|pediatric|\bmd\b|\bdo\b|\bpa-c\b|medical group|physician group|physicians|medical associates|health clinic|community health|federally qualified|fqhc|rural health|\bva clinic\b|veterans|community clinic|neighborhood health|student health|occupational health|employee health|corporate health|telehealth|telemedicine)\b/.test(n)) return 'clinic';
+  // ── Clinic / Primary Care ─────────────────────────────────────────────────
+  if (/\b(primary care|family medicine|family practice|family health|family doctor|internal medicine|general practice|general medicine|pediatric|\bmd\b|\bdo\b|\bpa-c\b|medical group|physician group|physicians group|medical associates|health clinic|community health|federally qualified|\bfqhc\b|rural health|\bva clinic\b|veterans|community clinic|neighborhood health|student health|occupational health|employee health|corporate health|telehealth|telemedicine|concierge|direct primary|retail health|minute clinic|patient first)\b/.test(n)) return 'clinic';
 
-  // ── Default: treat as clinic rather than showing in all type searches ─────
-  // This prevents specialty-sounding names (allergy, etc.) from appearing
-  // when the user has filtered to hospitals/ED/urgent care only.
+  // ── Default: treat as clinic ──────────────────────────────────────────────
   return 'clinic';
 }
 
@@ -2009,15 +2005,28 @@ function groupBySystem(facilities, targetInput) {
 // ── Auto-grouping by shared name prefix ───────────────────────────────────────
 // Common generic words that should NOT trigger auto-grouping on their own
 const AUTO_GROUP_STOPWORDS = new Set([
-  'the','and','of','at','in','for','a','an',
+  // Articles / prepositions
+  'the','and','of','at','in','for','a','an','by','to','with',
+  // Generic healthcare words
   'medical','health','care','center','centre','clinic','hospital',
   'medicine','group','associates','services','system','network',
   'practice','practices','physicians','physician','doctors','doctor',
   'regional','community','general','national','university','institute',
   'wellness','healthcare','specialty','specialist','specialists',
+  'ambulatory','surgical','surgery','outpatient','inpatient',
+  // Directional / generic location words
   'new','old','north','south','east','west','central','upper','lower',
+  'greater','metro','metropolitan','suburban','downtown','midtown',
+  // Religious / system branding words
   'saint','st','mt','mount','holy','sacred','mercy','providence',
-  'memorial','foundation','partners','alliance','integrated'
+  'memorial','foundation','partners','alliance','integrated',
+  // State abbreviations that appear in names
+  'ma','ct','ri','nh','vt','me','ny','nj','pa',
+  // Common city names that appear as prefixes
+  'boston','cambridge','worcester','springfield','lowell','newton',
+  'quincy','brockton','lynn','somerville','fall','new','framingham',
+  // Words that trail off into location (causing truncation)
+  'faculty','harvard','for','by','at','with','via'
 ]);
 
 function autoGroupByName(facilities) {
@@ -2284,10 +2293,11 @@ function buildInsights() {
   const compShareP  = total > 0 ? Math.round((totalComp/total)*100) : 0;
 
   const competitors = Object.entries(systems)
-    .filter(([s]) => s !== targetKey)
+    .filter(([s]) => s !== targetKey && s !== 'Independent / Community')
     .map(([name,arr]) => ({ name, count: arr.length, share: total>0?Math.round((arr.length/total)*100):0 }))
     .sort((a,b) => b.count - a.count);
 
+  const indCount = systems['Independent / Community'] ? systems['Independent / Community'].length : 0;
   const totalCompCount = competitors.reduce((a,c)=>a+c.count,0);
   const top     = competitors[0];
   const leakage = competitors.filter(c => c.count >= targetCount);
@@ -2455,14 +2465,13 @@ function buildInsights() {
                          ` Your network controls most follow-up access in this market — care coordination can turn that into measurable loyalty and retention.`)
     )}
 
-    <!-- ── Leakage systems ── -->
-    <div class="sec">Systems Exceeding Your Footprint</div>
-    <p style="font-size:11px;color:var(--muted);margin-bottom:8px;line-height:1.5">These competitors each operate as many or more sites than ${targetKey||'target'} in this area — indicating the highest leakage risk.</p>
-    ${leakageRows}
-
-    <!-- ── Full competitor breakdown ── -->
+    <!-- ── Competitor breakdown ── -->
     <div class="sec">Competitor Breakdown</div>
+    <p style="font-size:11px;color:var(--muted);margin-bottom:8px;line-height:1.5">Named health systems ranked by facility count in this market. Independent / Community facilities shown separately.</p>
     ${compRowsHtml}
+    ${indCount > 0 ? `<div style="margin-top:8px;padding:6px 10px;background:#f8fafc;border:1px solid var(--border);border-radius:6px;font-size:11px;color:var(--muted)">
+      <strong style="color:var(--text-2)">${indCount} Independent / Community</strong> facilities also in this market — not affiliated with a named health system.
+    </div>` : ''}
   `;
 }
 
@@ -3099,7 +3108,18 @@ function applyExcelFacilities(rawFacilities, centerLat, centerLon, radiusMeters,
     return haversineMeters(centerLat, centerLon, ef.lat, ef.lon) <= (radiusMeters || 40000);
   });
 
-  var toAdd = inRadius.filter(function(ef) {
+  // Apply name-based exclusion to QHIN facilities
+  // (they bypass shouldExclude since they're pre-vetted, but we still need to filter junk)
+  var inRadiusFiltered = inRadius.filter(function(ef) {
+    var name = (ef.tags && ef.tags.name) ? ef.tags.name.toLowerCase() : '';
+    if (!name) return false;
+    for (var ei = 0; ei < EXCLUDE_NAME_RX.length; ei++) {
+      if (EXCLUDE_NAME_RX[ei].test(name)) return false;
+    }
+    return true;
+  });
+
+  var toAdd = inRadiusFiltered.filter(function(ef) {
     // Deduplicate against existing results by name + proximity
     return !existing.some(function(ex) {
       var exLat = ex.lat || (ex.center && ex.center.lat);
@@ -3112,7 +3132,7 @@ function applyExcelFacilities(rawFacilities, centerLat, centerLon, radiusMeters,
   });
 
   console.log('Excel: ' + allExcel.length.toLocaleString() + ' total | '
-    + inRadius.length + ' in radius | ' + toAdd.length + ' new (not in OSM/NPI/CMS)');
+    + inRadiusFiltered.length + ' in radius | ' + toAdd.length + ' new (not in OSM/NPI/CMS)');
   return existing.concat(toAdd);
 }
 
