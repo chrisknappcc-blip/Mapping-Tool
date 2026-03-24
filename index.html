@@ -725,6 +725,36 @@ const customIcons = { target: null, competitor: null };
 // Care Continuity logo for PDF export — persisted across sessions
 let ccLogoDataUrl = null;
 
+async function loadSharedIcon() {
+  try {
+    var res = await fetch('/api/router?action=icon-load');
+    if (!res.ok) return;
+    var data = await res.json();
+    if (!data.dataUrl) return;
+    customIcons.target = data.dataUrl;
+    var prev = document.getElementById('targetIconPreview');
+    if (prev) { prev.src = data.dataUrl; prev.style.display = 'inline-block'; }
+    console.log('Target icon loaded from shared storage');
+  } catch(e) {
+    console.warn('Could not load shared icon: ' + e.message);
+  }
+}
+
+async function saveSharedIcon(dataUrl) {
+  try {
+    var res = await fetch('/api/router?action=icon-save', {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain' },
+      body: dataUrl
+    });
+    var result = await res.json();
+    if (!res.ok) console.warn('Icon save failed:', result);
+    else console.log('Target icon saved to shared storage:', result);
+  } catch(e) {
+    console.warn('Could not save shared icon: ' + e.message);
+  }
+}
+
 async function loadSharedLogo() {
   try {
     var res = await fetch('/api/router?action=logo-load');
@@ -751,8 +781,9 @@ async function saveSharedLogo(dataUrl) {
       headers: { 'Content-Type': 'text/plain' },
       body: dataUrl
     });
-    if (!res.ok) console.warn('Logo save HTTP ' + res.status);
-    else console.log('Logo saved to shared storage');
+    var saveResult = await res.json();
+    if (!res.ok) console.warn('Logo save failed:', saveResult);
+    else console.log('Logo saved to shared storage:', saveResult);
   } catch(e) {
     console.warn('Could not save shared logo: ' + e.message);
   }
@@ -818,6 +849,8 @@ function handleIconUpload(which, e) {
     const prev = document.getElementById(which + 'IconPreview');
     prev.src = ev.target.result;
     prev.style.display = 'inline-block';
+    // Save target icon to shared storage so all team members see it
+    if (which === 'target') saveSharedIcon(ev.target.result);
   };
   reader.readAsDataURL(file);
 }
@@ -853,6 +886,10 @@ function clearIcon(which) {
   const prev = document.getElementById(which + 'IconPreview');
   prev.src = '';
   prev.style.display = 'none';
+  if (which === 'target') {
+    fetch('/api/router?action=icon-clear', { method: 'POST' })
+      .catch(function(e) { console.warn('Icon clear failed: ' + e.message); });
+  }
 }
 
 // ── Drop-pin SVG generator ──────────────────────────────────────────────────
@@ -3790,10 +3827,11 @@ function bootstrap() {
   }
   initMap();
 
-  // Load QHIN data, shared state and logo in the background
+  // Load QHIN data, shared state, logo and icon in the background
   loadQHINData();
   loadSharedState();
   loadSharedLogo();
+  loadSharedIcon();
 
   // ── Debounced redraw helpers ────────────────────────────────────────────
   // All pin controls use a 120ms debounce — updates the label immediately
