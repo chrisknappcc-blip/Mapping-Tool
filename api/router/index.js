@@ -300,6 +300,97 @@ app.http('router', {
       }
     }
 
+    // ── build-cms ─────────────────────────────────────────────────────────────
+    // One-time function: downloads CMS data and saves to Blob Storage
+    if (action === 'build-cms') {
+      if (!sasToken) return jsonResponse(500, { error: 'SAS token not configured' });
+      context.log('Building CMS data...');
+
+      const PROVIDER_TYPE_MAP = {
+        '01':'hospital','02':'hospital','03':'hospital','04':'hospital',
+        '05':'hospital','06':'hospital','07':'outpatient','08':'outpatient',
+        '09':'rehab','10':'rehab','11':'clinic','12':'rehab',
+        '13':'outpatient','14':'rehab','15':'outpatient','16':'rehab',
+        '17':'clinic','18':'outpatient','19':'clinic','20':'clinic',
+        '21':'hospital','22':'clinic','23':'outpatient','24':'clinic',
+        '25':'specialist','26':'rehab','27':'clinic','28':'outpatient',
+        '29':'outpatient','31':'outpatient','33':'hospital'
+      };
+
+      try {
+        // Download CMS Provider of Services file
+        context.log('Downloading CMS data...');
+        const cmsUrl = 'https://data.cms.gov/api/1/datastore/query/f36c7bbc-82e8-4cfd-9a0d-5e9f5f9c49a0/0?results_format=csv&limit=100000&offset=0';
+        const raw = await fetchText(cmsUrl);
+        context.log('Downloaded ' + raw.length + ' bytes');
+
+        // Parse CSV
+        const lines = raw.split('\n');
+        const headers = parseCSVLine(lines[0]);
+        context.log('Columns: ' + headers.slice(0,10).join(', ') + '...');
+
+        function col(row, ...names) {
+          for (var i = 0; i < names.length; i++) {
+            var idx = headers.indexOf(names[i]);
+            if (idx >= 0 && row[idx]) return row[idx].trim();
+          }
+          return '';
+        }
+
+        var facilities = [];
+        var skipped = 0;
+
+        for (var i = 1; i < lines.length; i++) {
+          var line = lines[i].trim();
+          if (!line) continue;
+          var row = parseCSVLine(line);
+
+          var name  = col(row, 'FAC_NAME', 'PRVDR_NM', 'NAME');
+          var lat   = parseFloat(col(row, 'LAT_CD', 'LATITUDE', 'lat'));
+          var lon   = parseFloat(col(row, 'LONG_CD', 'LONGITUDE', 'lon'));
+          var state = col(row, 'STATE_CD', 'STATE');
+          var zip   = col(row, 'ZIP_CD', 'ZIP');
+          var city  = col(row, 'CITY_NAME', 'CITY');
+          var addr  = col(row, 'ST_ADR', 'ADDRESS');
+          var type  = col(row, 'PRVDR_CTGRY_CD', 'PROVIDER_TYPE');
+          var ccn   = col(row, 'PRVDR_NUM', 'CCN');
+
+          if (!name || isNaN(lat) || isNaN(lon) || lat === 0 || lon === 0) {
+            skipped++;
+            continue;
+          }
+
+          facilities.push({
+            id: 'cms_' + (ccn || i),
+            type: 'cms',
+            lat: lat, lon: lon,
+            _facType: PROVIDER_TYPE_MAP[type] || 'clinic',
+            tags: { name: name, address: addr, city: city, state: state, postcode: zip }
+          });
+        }
+
+        context.log('Parsed ' + facilities.length + ' facilities, skipped ' + skipped);
+
+        // Group by state
+        var byState = {};
+        facilities.forEach(function(f) {
+          var st = f.tags.state || 'XX';
+          if (!byState[st]) byState[st] = [];
+          byState[st].push(f);
+        });
+
+        var output = JSON.stringify({ total: facilities.length, built: new Date().toISOString(), by_state: byState });
+        var url = 'https://carepathiqdata.blob.core.windows.net/cms-data/cms_providers.json' + sasToken;
+        await putText(url, output, 'application/json');
+
+        return jsonResponse(200, { success: true, facilities: facilities.length, skipped: skipped, states: Object.keys(byState).length });
+
+      } catch(err) {
+        context.log.error('CMS build error: ' + err.message);
+        return jsonResponse(500, { error: 'CMS build failed', detail: err.message });
+      }
+    }
+
     // ── cms-data ──────────────────────────────────────────────────────────────
     if (action === 'cms-data') {
       if (!sasToken) return jsonResponse(500, { error: 'SAS token not configured' });
