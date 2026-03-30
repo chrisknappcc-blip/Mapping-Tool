@@ -1,3 +1,4 @@
+// v2
 const { app } = require('@azure/functions');
 const https = require('https');
 
