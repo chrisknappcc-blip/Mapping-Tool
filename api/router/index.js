@@ -300,6 +300,25 @@ app.http('router', {
       }
     }
 
+    // ── cms-data ──────────────────────────────────────────────────────────────
+    if (action === 'cms-data') {
+      if (!sasToken) return jsonResponse(500, { error: 'SAS token not configured' });
+      try {
+        const url = 'https://carepathiqdata.blob.core.windows.net/cms-data/cms_providers.json' + sasToken;
+        const raw = await fetchText(url);
+        return {
+          status: 200,
+          headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*', 'Cache-Control': 'public, max-age=86400' },
+          body: raw
+        };
+      } catch(err) {
+        if (err.message && err.message.startsWith('404')) {
+          return jsonResponse(200, { error: 'CMS data not yet uploaded', total: 0, by_state: {} });
+        }
+        return jsonResponse(502, { error: 'CMS load failed', detail: err.message });
+      }
+    }
+
     // ── logo-load ─────────────────────────────────────────────────────────────
     if (action === 'logo-load') {
       if (!sasToken) return jsonResponse(500, { error: 'SAS token not configured' });
