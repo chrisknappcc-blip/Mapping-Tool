@@ -1,10 +1,16 @@
 const https = require('https');
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
+const CORS_HEADERS = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization'
+};
+
 function jsonResponse(statusCode, obj) {
   return {
     statusCode: statusCode,
-    headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+    headers: Object.assign({ 'Content-Type': 'application/json' }, CORS_HEADERS),
     body: JSON.stringify(obj)
   };
 }
@@ -154,7 +160,7 @@ exports.handler = async function(event, context) {
       const qs = '?' + new URLSearchParams(npiParams).toString();
       try {
         const data = await fetchText('https://npiregistry.cms.hhs.gov/api/' + qs);
-        return { statusCode: 200, headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }, body: data };
+        return { statusCode: 200, headers: Object.assign({ 'Content-Type': 'application/json' }, CORS_HEADERS), body: data };
       } catch(err) {
         return jsonResponse(502, { error: 'NPI failed', detail: err.message });
       }
@@ -169,7 +175,7 @@ exports.handler = async function(event, context) {
       const gUrl = 'https://nominatim.openstreetmap.org/' + (isRev ? 'reverse?' : 'search?') + qs2;
       try {
         const data = await fetchText(gUrl, { 'User-Agent': 'CarePathIQ/1.0', 'Accept-Language': 'en' });
-        return { statusCode: 200, headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }, body: data };
+        return { statusCode: 200, headers: Object.assign({ 'Content-Type': 'application/json' }, CORS_HEADERS), body: data };
       } catch(err) {
         return jsonResponse(502, { error: 'Geocode failed', detail: err.message });
       }
@@ -240,7 +246,7 @@ exports.handler = async function(event, context) {
       if (!sasToken) return jsonResponse(500, { error: 'SAS token not configured' });
       try {
         const raw = await fetchText(getBlobUrl(sasToken, 'app-state', 'shared-state.json'));
-        return { statusCode: 200, headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }, body: raw };
+        return { statusCode: 200, headers: Object.assign({ 'Content-Type': 'application/json' }, CORS_HEADERS), body: raw };
       } catch(err) {
         if (err.message && err.message.startsWith('404')) {
           return jsonResponse(200, { overrides: {}, customSystems: [], excluded: [] });
@@ -411,7 +417,7 @@ exports.handler = async function(event, context) {
       if (!sasToken) return jsonResponse(500, { error: 'SAS token not configured' });
       try {
         const raw = await fetchText(getBlobUrl(sasToken, 'cms-data', 'cms_providers.json'));
-        return { statusCode: 200, headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*', 'Cache-Control': 'public, max-age=86400' }, body: raw };
+        return { statusCode: 200, headers: Object.assign({ 'Content-Type': 'application/json', 'Cache-Control': 'public, max-age=86400' }, CORS_HEADERS), body: raw };
       } catch(err) {
         if (err.message && err.message.startsWith('404')) {
           return jsonResponse(200, { error: 'CMS data not yet uploaded', total: 0, by_state: {} });
@@ -421,6 +427,11 @@ exports.handler = async function(event, context) {
     }
 
     return jsonResponse(404, { error: 'Unknown action: ' + action });
+
+  } catch(topErr) {
+    return jsonResponse(500, { error: 'Router crash', detail: topErr.message, stack: topErr.stack });
+  }
+};
 
   } catch(topErr) {
     return jsonResponse(500, { error: 'Router crash', detail: topErr.message, stack: topErr.stack });
