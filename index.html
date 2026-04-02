@@ -2981,14 +2981,15 @@ var excelFacilities = [];
 async function loadQHINData() {
   try {
     setLoaderMsg('Loading QHIN facility data…');
-    var res = await fetch('https://eclectic-kitten-27fdf8.netlify.app/.netlify/functions/router?action=qhin-data');
+    // Fetch directly from public blob — no function needed, no size limits
+    var res = await fetch('https://carepathiqdata.blob.core.windows.net/qhin-data/facilities.json');
     if (!res.ok) {
       console.warn('QHIN data not available: HTTP ' + res.status);
       return;
     }
-    var data = await res.json();
-    if (data.facilities && data.facilities.length) {
-      excelFacilities = data.facilities;
+    var facilities = await res.json();
+    if (facilities && facilities.length) {
+      excelFacilities = facilities;
       console.log('QHIN: loaded ' + excelFacilities.length + ' facilities from Blob Storage');
     }
   } catch(e) {
