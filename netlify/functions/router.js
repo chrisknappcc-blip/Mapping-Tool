@@ -432,8 +432,3 @@ exports.handler = async function(event, context) {
     return jsonResponse(500, { error: 'Router crash', detail: topErr.message, stack: topErr.stack });
   }
 };
-
-  } catch(topErr) {
-    return jsonResponse(500, { error: 'Router crash', detail: topErr.message, stack: topErr.stack });
-  }
-};
