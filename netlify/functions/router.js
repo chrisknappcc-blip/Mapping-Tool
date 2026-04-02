@@ -352,6 +352,23 @@ exports.handler = async function(event, context) {
       }
     }
 
+    // ── cms-columns ──────────────────────────────────────────────────────────
+    // Diagnostic: shows what columns CMS API actually returns
+    if (action === 'cms-columns') {
+      try {
+        const cmsUrl = 'https://data.cms.gov/api/1/datastore/query/f36c7bbc-82e8-4cfd-9a0d-5e9f5f9c49a0/0?results_format=csv&limit=2&offset=0';
+        const raw = await fetchText(cmsUrl);
+        const lines = raw.split('\n');
+        const headers = parseCSVLine(lines[0]);
+        const sample = lines[1] ? parseCSVLine(lines[1]) : [];
+        const preview = {};
+        headers.forEach(function(h, i) { preview[h] = sample[i] || ''; });
+        return jsonResponse(200, { columns: headers, sample: preview, total_lines: lines.length });
+      } catch(err) {
+        return jsonResponse(500, { error: 'CMS columns check failed', detail: err.message });
+      }
+    }
+
     // ── build-cms ────────────────────────────────────────────────────────────
     if (action === 'build-cms') {
       if (!sasToken) return jsonResponse(500, { error: 'SAS token not configured' });
