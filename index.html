@@ -703,7 +703,7 @@ async function loadCMSData() {
   if (cmsLoadAttempted) return cmsData;
   cmsLoadAttempted = true;
   try {
-    const res = await fetch('/api/router?action=cms-data');
+    const res = await fetch('https://eclectic-kitten-27fdf8.netlify.app/.netlify/functions/router?action=cms-data');
     if (!res.ok) {
       console.info('CMS data not available (HTTP ' + res.status + ')');
       return null;
@@ -730,7 +730,7 @@ async function loadIconForSystem(systemName) {
   if (!systemName) return;
   try {
     var key = encodeURIComponent(systemName.toLowerCase().trim());
-    var res = await fetch('/api/router?action=icon-load&system=' + key);
+    var res = await fetch('https://eclectic-kitten-27fdf8.netlify.app/.netlify/functions/router?action=icon-load&system=' + key);
     if (!res.ok) return;
     var data = await res.json();
     if (!data.dataUrl) {
@@ -760,7 +760,7 @@ async function saveSharedIcon(dataUrl) {
   }
   try {
     var key = encodeURIComponent(systemName.toLowerCase().trim());
-    var res = await fetch('/api/router?action=icon-save&system=' + key, {
+    var res = await fetch('https://eclectic-kitten-27fdf8.netlify.app/.netlify/functions/router?action=icon-save&system=' + key, {
       method: 'POST',
       headers: { 'Content-Type': 'text/plain' },
       body: dataUrl
@@ -778,7 +778,7 @@ function loadSharedIcon() { /* icons now load per system in runSearch */ }
 
 async function loadSharedLogo() {
   try {
-    var res = await fetch('/api/router?action=logo-load');
+    var res = await fetch('https://eclectic-kitten-27fdf8.netlify.app/.netlify/functions/router?action=logo-load');
     if (!res.ok) return;
     var data = await res.json();
     if (!data.dataUrl) return;
@@ -797,7 +797,7 @@ async function loadSharedLogo() {
 async function saveSharedLogo(dataUrl) {
   try {
     // Send the raw data URL as text — router will decode it server-side
-    var res = await fetch('/api/router?action=logo-save', {
+    var res = await fetch('https://eclectic-kitten-27fdf8.netlify.app/.netlify/functions/router?action=logo-save', {
       method: 'POST',
       headers: { 'Content-Type': 'text/plain' },
       body: dataUrl
@@ -897,7 +897,7 @@ function clearLogo() {
   prev.src = '';
   prev.style.display = 'none';
   // Clear from shared storage
-  fetch('/api/router?action=logo-clear', { method: 'POST' })
+  fetch('https://eclectic-kitten-27fdf8.netlify.app/.netlify/functions/router?action=logo-clear', { method: 'POST' })
     .catch(function(e) { console.warn('Logo clear failed: ' + e.message); });
 }
 
@@ -912,7 +912,7 @@ function clearIcon(which) {
       ? document.getElementById('targetInput').value.trim()
       : '';
     var key = encodeURIComponent(systemName.toLowerCase().trim());
-    fetch('/api/router?action=icon-clear&system=' + key, { method: 'POST' })
+    fetch('https://eclectic-kitten-27fdf8.netlify.app/.netlify/functions/router?action=icon-clear&system=' + key, { method: 'POST' })
       .catch(function(e) { console.warn('Icon clear failed: ' + e.message); });
   }
 }
@@ -1006,7 +1006,7 @@ function makeLeafletIcon(dataUrl, size) {
 
 // ── Geocoding ────────────────────────────────────────────
 async function getCoords(zip) {
-  const url = '/api/router?action=geocode-proxy&postalcode=' + encodeURIComponent(zip) + '&country=USA&limit=1';
+  const url = 'https://eclectic-kitten-27fdf8.netlify.app/.netlify/functions/router?action=geocode-proxy&postalcode=' + encodeURIComponent(zip) + '&country=USA&limit=1';
   const res = await fetch(url, { headers: {'Accept-Language':'en'} });
   if (!res.ok) throw new Error('Geocoding HTTP ' + res.status);
   const data = await res.json();
@@ -1139,7 +1139,7 @@ const NPI_TAXONOMY = {
 // and filter results by distance ourselves
 async function getStateFromCoords(lat, lon) {
   try {
-    const url = '/api/router?action=geocode-proxy&lat=' + lat + '&lon=' + lon + '&zoom=5';
+    const url = 'https://eclectic-kitten-27fdf8.netlify.app/.netlify/functions/router?action=geocode-proxy&lat=' + lat + '&lon=' + lon + '&zoom=5';
     const res = await fetch(url, { headers: {'Accept-Language':'en'} });
     if (!res.ok) return null;
     const data = await res.json();
@@ -1164,7 +1164,7 @@ function haversineMeters(lat1, lon1, lat2, lon2) {
 async function queryNPI(taxonomyCode, state, enumerationType, limit) {
   enumerationType = enumerationType || 'NPI-2';
   limit = limit || 200;
-  var url = '/api/router?action=npi-proxy&version=2.1'
+  var url = 'https://eclectic-kitten-27fdf8.netlify.app/.netlify/functions/router?action=npi-proxy&version=2.1'
     + '&taxonomy_description=' + encodeURIComponent(taxonomyCode)
     + '&state=' + encodeURIComponent(state)
     + '&limit=' + limit
@@ -1236,7 +1236,7 @@ function npiToFacility(npi, lat, lon, enumerationType) {
 async function geocodeAddress(addr, city, state, zip) {
   var q = [addr, city, state, zip].filter(Boolean).join(', ') + ', USA';
   try {
-    var url = '/api/router?action=geocode-proxy&q=' + encodeURIComponent(q) + '&limit=1&countrycodes=us';
+    var url = 'https://eclectic-kitten-27fdf8.netlify.app/.netlify/functions/router?action=geocode-proxy&q=' + encodeURIComponent(q) + '&limit=1&countrycodes=us';
     var res = await fetch(url, { headers: {'Accept-Language':'en'} });
     if (!res.ok) return null;
     var data = await res.json();
@@ -2614,7 +2614,7 @@ function scheduleSaveSharedState() {
 
 async function loadSharedState() {
   try {
-    var res = await fetch('/api/router?action=state-load');
+    var res = await fetch('https://eclectic-kitten-27fdf8.netlify.app/.netlify/functions/router?action=state-load');
     if (!res.ok) { console.warn('State load HTTP ' + res.status); return; }
     var state = await res.json();
     if (state.overrides)     systemOverrides    = state.overrides;
@@ -2638,7 +2638,7 @@ async function saveSharedState() {
       customSystems: customSystemNames,
       excluded:      [...excluded]
     };
-    var res = await fetch('/api/router?action=state-save', {
+    var res = await fetch('https://eclectic-kitten-27fdf8.netlify.app/.netlify/functions/router?action=state-save', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(state)
@@ -2981,7 +2981,7 @@ var excelFacilities = [];
 async function loadQHINData() {
   try {
     setLoaderMsg('Loading QHIN facility data…');
-    var res = await fetch('/api/router?action=qhin-data');
+    var res = await fetch('https://eclectic-kitten-27fdf8.netlify.app/.netlify/functions/router?action=qhin-data');
     if (!res.ok) {
       console.warn('QHIN data not available: HTTP ' + res.status);
       return;
