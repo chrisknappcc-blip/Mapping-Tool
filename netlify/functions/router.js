@@ -356,7 +356,7 @@ exports.handler = async function(event, context) {
     // Diagnostic: shows what columns CMS API actually returns
     if (action === 'cms-columns') {
       try {
-        const cmsUrl = 'https://data.cms.gov/api/1/datastore/query/f36c7bbc-82e8-4cfd-9a0d-5e9f5f9c49a0/0?results_format=csv&limit=2&offset=0';
+        const cmsUrl = 'https://data.cms.gov/sites/default/files/2026-01/c500f848-83b3-4f29-a677-562243a2f23b/Hospital_and_other.DATA.Q4_2025.csv';
         const raw = await fetchText(cmsUrl);
         const lines = raw.split('\n');
         const headers = parseCSVLine(lines[0]);
@@ -383,7 +383,7 @@ exports.handler = async function(event, context) {
         '29':'outpatient','31':'outpatient','33':'hospital'
       };
       try {
-        const cmsUrl = 'https://data.cms.gov/api/1/datastore/query/f36c7bbc-82e8-4cfd-9a0d-5e9f5f9c49a0/0?results_format=csv&limit=100000&offset=0';
+        const cmsUrl = 'https://data.cms.gov/sites/default/files/2026-01/c500f848-83b3-4f29-a677-562243a2f23b/Hospital_and_other.DATA.Q4_2025.csv';
         const raw = await fetchText(cmsUrl);
         const lines = raw.split('\n');
         const headers = parseCSVLine(lines[0]);
