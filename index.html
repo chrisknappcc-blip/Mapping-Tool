@@ -948,11 +948,15 @@ const searchBox = document.getElementById('iconLibSearch');
 
     let html = icons.map(function(ic) {
       const label = ic.system.replace(/_/g, ' ');
-      return '<div class="icon-lib-card" id="icon-card-' + ic.system + '">'
-        + '<button class="icon-lib-del" onclick="deleteLibraryIcon(' + "'" + ic.system + "'" + ')" title="Delete">✕</button>'
-        + '<img src="" data-system="' + ic.system + '" alt="' + label + '" style="opacity:.3" onerror="this.style.opacity=0.15"/>'
-        + '<div class="icon-lib-name">' + label + '</div>'
-        + '</div>';
+return '<div class="icon-lib-card" id="icon-card-' + ic.system + '">'
+  + '<button class="icon-lib-del" onclick="deleteLibraryIcon(' + "'" + ic.system + "'" + ')" title="Delete">✕</button>'
+  + '<img src="" data-system="' + ic.system + '" alt="' + label + '" style="opacity:.3" onerror="this.style.opacity=0.15"/>'
+  + '<div class="icon-lib-name">' + label + '</div>'
+  + '<button onclick="useLibraryIcon(' + "'" + ic.system + "'" + ')" '
+  + 'style="margin-top:4px;width:100%;font-size:9px;font-weight:700;text-transform:uppercase;'
+  + 'letter-spacing:.05em;padding:3px 0;background:var(--accent);color:#fff;border:none;'
+  + 'border-radius:4px;cursor:pointer;">Use</button>'
+  + '</div>';
     }).join('');
 
     // Upload card at the end
@@ -983,6 +987,28 @@ const searchBox = document.getElementById('iconLibSearch');
   }
 }
 
+async function useLibraryIcon(system) {
+  const status = document.getElementById('iconLibStatus');
+  if (status) status.textContent = 'Loading…';
+  try {
+    const res = await fetch(API + '?action=icon-load&system=' + encodeURIComponent(system));
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const data = await res.json();
+    if (!data.dataUrl) { if (status) status.textContent = 'No image data found.'; return; }
+    customIcons.target = data.dataUrl;
+    const prev = document.getElementById('targetIconPreview');
+    if (prev) { prev.src = data.dataUrl; prev.style.display = 'inline-block'; }
+    if (status) status.textContent = 'Using icon for: ' + system.replace(/_/g, ' ');
+    // Redraw markers if a search has been run
+    if (lastData && lastData.systems) {
+      const targetKey = findTargetKey(lastData.systems, lastData.target);
+      drawMarkers(lastData.systems, targetKey);
+    }
+  } catch(e) {
+    if (status) status.textContent = 'Failed: ' + e.message;
+  }
+}
+  
 async function deleteLibraryIcon(system) {
   if (!confirm('Delete the icon for "' + system.replace(/_/g, ' ') + '"?')) return;
   const status = document.getElementById('iconLibStatus');
