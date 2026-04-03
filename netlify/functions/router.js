@@ -558,6 +558,39 @@ exports.handler = async function(event, context) {
       }
     }
 
+
+    // ── icon-list ────────────────────────────────────────────────────────────────────────
+    // Lists all blobs in the logos container whose name starts with "icon-".
+    // Returns: { icons: [ { system: "mass_general_brigham", blobName: "icon-mass_general_brigham" }, ... ] }
+    if (action === 'icon-list') {
+      if (!sasToken) return jsonResponse(500, { error: 'SAS token not configured' });
+      try {
+        // Azure Blob List API — prefix=icon- so cc-logo is excluded automatically
+        const listUrl = 'https://carepathiqdata.blob.core.windows.net/logos'
+          + sasToken + '&restype=container&comp=list&prefix=icon-';
+        const xml = await fetchText(listUrl);
+
+        // Azure Blob XML uses <Name> (capital N)
+        const icons = [];
+        const nameRx = /<Name>([^<]+)<\/Name>/g;
+        let m;
+        while ((m = nameRx.exec(xml)) !== null) {
+          const blobName = m[1];
+          if (!blobName.startsWith('icon-')) continue;
+          // Skip zero-byte blobs — icon-clear writes a 0-byte blob to "delete"
+          const escaped = blobName.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&');
+          const sizeMatch = new RegExp('<Name>' + escaped + '<\\/Name>[\\s\\S]*?<Content-Length>(\\d+)<\/Content-Length>').exec(xml);
+          if (sizeMatch && parseInt(sizeMatch[1], 10) === 0) continue;
+          const system = blobName.slice(5); // strip "icon-" prefix
+          icons.push({ system, blobName });
+        }
+
+        return jsonResponse(200, { icons });
+      } catch(err) {
+        return jsonResponse(502, { error: 'Icon list failed', detail: err.message });
+      }
+    }
+
     return jsonResponse(404, { error: 'Unknown action: ' + action });
 
   } catch(topErr) {
