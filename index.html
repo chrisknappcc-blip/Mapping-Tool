@@ -650,6 +650,11 @@ input::placeholder{color:var(--muted-2)}
     <div id="assign" class="panel"><p class="empty">Run a search to reassign facilities.</p></div>
     <div id="icons" class="panel">
       <div class="sec">System Icon Library</div>
+      <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px">
+  <input id="iconLibSearch" type="text" placeholder="Search icons…"
+    oninput="filterIconLibrary(this.value)"
+    style="flex:1;padding:5px 8px;font-size:12px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--text);outline:none"/>
+</div>
       <p style="font-size:11px;color:var(--muted);line-height:1.5;margin-bottom:10px">Icons saved here auto-load for all team members when that system is searched. Upload PNG or JPG.</p>
       <div id="iconLibStatus" style="font-size:11px;color:var(--muted);min-height:16px;margin-bottom:6px"></div>
       <div class="icon-lib-grid" id="iconLibGrid"><p class="empty">Loading…</p></div>
@@ -1020,8 +1025,27 @@ async function uploadLibraryIcon(event) {
     }
   };
   reader.readAsDataURL(file);
-}
 
+function filterIconLibrary(query) {
+  const q = query.toLowerCase().trim();
+  const cards = document.querySelectorAll('#iconLibGrid .icon-lib-card');
+  let visible = 0;
+  cards.forEach(function(card) {
+    const name = (card.querySelector('.icon-lib-name') || {}).textContent || '';
+    const match = !q || name.toLowerCase().includes(q);
+    card.style.display = match ? '' : 'none';
+    if (match) visible++;
+  });
+  // Keep the upload card always visible
+  const uploadCard = document.querySelector('#iconLibGrid .icon-lib-upload-card');
+  if (uploadCard) uploadCard.style.display = '';
+  // Update status
+  const status = document.getElementById('iconLibStatus');
+  if (status) {
+    const total = cards.length;
+    status.textContent = q ? (visible + ' of ' + total + ' icons match') : (total + ' icon' + (total !== 1 ? 's' : '') + ' saved');
+  }
+}
 
 const SYSTEM_COLORS = ['#2563eb','#16a34a','#9333ea','#ea580c','#0891b2','#be185d','#854d0e','#374151','#0d9488','#7c3aed'];
 const colorMap = {};
