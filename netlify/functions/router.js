@@ -608,7 +608,49 @@ exports.handler = async function(event, context) {
         return jsonResponse(502, { error: 'Icon list failed', detail: err.message });
       }
     }
+// ── search-cache-get ──────────────────────────────────────────────────────
+    if (action === 'search-cache-get') {
+      if (!sasToken) return jsonResponse(500, { error: 'SAS token not configured' });
+      const cacheKey = params.key || '';
+      if (!cacheKey) return jsonResponse(400, { error: 'key param required' });
+      try {
+        const raw = await fetchText(getBlobUrl(sasToken, 'app-state', 'search_cache.json'));
+        const cache = JSON.parse(raw);
+        const entry = cache[cacheKey];
+        if (!entry) return jsonResponse(200, { hit: false });
+        const age = Date.now() - new Date(entry.ts).getTime();
+        if (age > 30 * 24 * 60 * 60 * 1000) return jsonResponse(200, { hit: false, expired: true });
+        return jsonResponse(200, { hit: true, facilities: entry.facilities });
+      } catch(err) {
+        if (err.message && err.message.startsWith('404')) return jsonResponse(200, { hit: false });
+        return jsonResponse(502, { error: 'Search cache get failed', detail: err.message });
+      }
+    }
 
+    // ── search-cache-set ──────────────────────────────────────────────────────
+    if (action === 'search-cache-set') {
+      if (!sasToken) return jsonResponse(500, { error: 'SAS token not configured' });
+      let body;
+      try { body = JSON.parse(event.body || '{}'); } catch(e) { return jsonResponse(400, { error: 'Invalid JSON' }); }
+      const { key, facilities } = body;
+      if (!key || !facilities) return jsonResponse(400, { error: 'key and facilities required' });
+      try {
+        let cache = {};
+        try {
+          const raw = await fetchText(getBlobUrl(sasToken, 'app-state', 'search_cache.json'));
+          cache = JSON.parse(raw);
+        } catch(e) { /* start fresh */ }
+        const now = Date.now();
+        Object.keys(cache).forEach(function(k) {
+          if (now - new Date(cache[k].ts).getTime() > 30 * 24 * 60 * 60 * 1000) delete cache[k];
+        });
+        cache[key] = { facilities: facilities, ts: new Date().toISOString() };
+        await putText(getBlobUrl(sasToken, 'app-state', 'search_cache.json'), JSON.stringify(cache), 'application/json');
+        return jsonResponse(200, { success: true, cached_searches: Object.keys(cache).length });
+      } catch(err) {
+        return jsonResponse(500, { error: 'Search cache set failed', detail: err.message });
+      }
+    }
     return jsonResponse(404, { error: 'Unknown action: ' + action });
 
   } catch(topErr) {
