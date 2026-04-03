@@ -1255,28 +1255,6 @@ function makeLeafletIcon(dataUrl, size) {
 
 const API = 'https://eclectic-kitten-27fdf8.netlify.app/.netlify/functions/router';
 
-// ── Search result cache ───────────────────────────────────────────────────────
-function buildSearchCacheKey(zip, radiusMeters, types) {
-  return zip + '|' + radiusMeters + '|' + [...types].sort().join(',');
-}
-async function getSearchCache(key) {
-  try {
-    const res = await fetch(API + '?action=search-cache-get&key=' + encodeURIComponent(key));
-    if (!res.ok) return null;
-    const data = await res.json();
-    return data.hit ? data.facilities : null;
-  } catch(e) { return null; }
-}
-function setSearchCache(key, facilities) {
-  fetch(API + '?action=search-cache-set', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ key: key, facilities: facilities })
-  }).then(function(r) {
-    if (r.ok) console.log('Search cached: ' + key);
-  }).catch(function(e) { console.info('Search cache write failed (non-critical):', e.message); });
-}
-
 const GeocodeCache = {
   _mem: {},  // in-memory layer — survives tab session
 
@@ -3800,38 +3778,25 @@ async function runSearch() {
     catch(e) { throw new Error('Geocoding service unreachable. (' + e.message + ')'); }
     if (!coords) throw new Error(`ZIP "${zip}" not found.`);
 
-    // Load icon in parallel with the search pipeline
+    // Load icon in parallel with search pipeline — awaited before drawMarkers
     const iconPromise = loadIconForSystem(target);
 
-    // ── Check search cache first ──────────────────────────────────────────
-    const cacheKey = buildSearchCacheKey(zip, radius, ftype);
-    setLoaderMsg('Checking cache…');
-    let facilities = await getSearchCache(cacheKey);
+    let facilities;
+    try { facilities = await getFacilities(coords.lat, coords.lon, radius, ftype); }
+    catch(e) { throw new Error('Hospital data service unreachable. (' + e.message + ')'); }
 
-    if (facilities) {
-      console.log('Search cache hit: ' + cacheKey + ' (' + facilities.length + ' facilities)');
-      setLoaderMsg('Loading from cache…');
-    } else {
-      // ── Full pipeline ─────────────────────────────────────────────────
-      try { facilities = await getFacilities(coords.lat, coords.lon, radius, ftype); }
-      catch(e) { throw new Error('Hospital data service unreachable. (' + e.message + ')'); }
+    // Apply embedded locations first, then check if anything exists
+    facilities = applyExcelFacilities(facilities, coords.lat, coords.lon, radius, ftype);
 
-      // Apply embedded locations first, then check if anything exists
-      facilities = applyExcelFacilities(facilities, coords.lat, coords.lon, radius, ftype);
-
-      if (!facilities.length) {
-        showError('No facilities found. Try a larger radius or different facility type.');
-        return;
-      }
-
-      // Enrich facility types using CMS Provider of Services index (silent, non-blocking)
-      // Runs after QHIN/OSM results are in — stamps _facType only where no team override exists.
-      setLoaderMsg('Verifying facility types…');
-      facilities = await enrichWithCMS(facilities);
-
-      // Write to cache async — never blocks UI
-      setSearchCache(cacheKey, facilities);
+    if (!facilities.length) {
+      showError('No facilities found. Try a larger radius or different facility type.');
+      return;
     }
+
+    // Enrich facility types using CMS Provider of Services index (silent, non-blocking)
+    // Runs after QHIN/OSM results are in — stamps _facType only where no team override exists.
+    setLoaderMsg('Verifying facility types…');
+    facilities = await enrichWithCMS(facilities);
 
     const systems = groupBySystem(facilities, target);
     const targetKey = findTargetKey(systems, target);
