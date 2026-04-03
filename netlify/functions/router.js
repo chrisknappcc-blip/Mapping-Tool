@@ -115,6 +115,36 @@ function parseCSVLine(line) {
   return result;
 }
 
+
+// ── Icon index helpers ────────────────────────────────────────────────────────
+// icon-index.json is a simple JSON array of system key strings stored in logos/.
+// This avoids needing the List permission on the SAS token.
+// Format: ["mass_general_brigham", "beth_israel_lahey", ...]
+
+async function readIconIndex(sasToken) {
+  try {
+    const raw = await fetchText(getBlobUrl(sasToken, 'logos', 'icon-index.json'));
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch(e) {
+    // 404 means no icons saved yet — return empty list, not an error
+    if (e.message && e.message.startsWith('404')) return [];
+    throw e;
+  }
+}
+
+async function updateIconIndex(sasToken, system, op) {
+  // op: 'add' | 'remove'
+  let systems = [];
+  try { systems = await readIconIndex(sasToken); } catch(e) { /* start fresh */ }
+  if (op === 'add') {
+    if (!systems.includes(system)) systems.push(system);
+  } else {
+    systems = systems.filter(function(s) { return s !== system; });
+  }
+  await putText(getBlobUrl(sasToken, 'logos', 'icon-index.json'), JSON.stringify(systems), 'application/json');
+}
+
 let qhinCache = null, qhinCacheTime = 0;
 const CACHE_TTL = 60 * 60 * 1000;
 
@@ -342,6 +372,8 @@ exports.handler = async function(event, context) {
         if (!matches) return jsonResponse(400, { error: 'Invalid data URL' });
         const buffer = Buffer.from(matches[2], 'base64');
         await putBinary(getBlobUrl(sasToken, 'logos', blobName), buffer, matches[1]);
+        // Update icon index
+        await updateIconIndex(sasToken, system, 'add');
         return jsonResponse(200, { success: true, bytes: buffer.length, system: system });
       } catch(err) {
         return jsonResponse(500, { error: 'Icon save failed', detail: err.message });
@@ -355,6 +387,8 @@ exports.handler = async function(event, context) {
       const blobName = 'icon-' + system.replace(/[^a-z0-9-]/g, '_');
       try {
         await putBinary(getBlobUrl(sasToken, 'logos', blobName), Buffer.alloc(0), 'image/png');
+        // Update icon index
+        await updateIconIndex(sasToken, system, 'remove');
         return jsonResponse(200, { success: true });
       } catch(err) {
         return jsonResponse(500, { error: 'Icon clear failed', detail: err.message });
@@ -560,31 +594,15 @@ exports.handler = async function(event, context) {
 
 
     // ── icon-list ────────────────────────────────────────────────────────────────────────
-    // Lists all blobs in the logos container whose name starts with "icon-".
+    // Lists icons by reading icon-index.json from Blob (avoids needing List permission on SAS token).
     // Returns: { icons: [ { system: "mass_general_brigham", blobName: "icon-mass_general_brigham" }, ... ] }
     if (action === 'icon-list') {
       if (!sasToken) return jsonResponse(500, { error: 'SAS token not configured' });
       try {
-        // Azure Blob List API — prefix=icon- so cc-logo is excluded automatically
-        const listUrl = 'https://carepathiqdata.blob.core.windows.net/logos'
-          + sasToken + '&restype=container&comp=list&prefix=icon-';
-        const xml = await fetchText(listUrl);
-
-        // Azure Blob XML uses <Name> (capital N)
-        const icons = [];
-        const nameRx = /<Name>([^<]+)<\/Name>/g;
-        let m;
-        while ((m = nameRx.exec(xml)) !== null) {
-          const blobName = m[1];
-          if (!blobName.startsWith('icon-')) continue;
-          // Skip zero-byte blobs — icon-clear writes a 0-byte blob to "delete"
-          const escaped = blobName.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&');
-          const sizeMatch = new RegExp('<Name>' + escaped + '<\\/Name>[\\s\\S]*?<Content-Length>(\\d+)<\/Content-Length>').exec(xml);
-          if (sizeMatch && parseInt(sizeMatch[1], 10) === 0) continue;
-          const system = blobName.slice(5); // strip "icon-" prefix
-          icons.push({ system, blobName });
-        }
-
+        const systems = await readIconIndex(sasToken);
+        const icons = systems.map(function(system) {
+          return { system: system, blobName: 'icon-' + system };
+        });
         return jsonResponse(200, { icons });
       } catch(err) {
         return jsonResponse(502, { error: 'Icon list failed', detail: err.message });
