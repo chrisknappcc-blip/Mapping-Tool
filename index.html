@@ -385,6 +385,26 @@ input::placeholder{color:var(--muted-2)}
   font-size:13px;font-weight:600;color:var(--accent);
 }
 #loader.visible{display:flex}
+
+/* ── Search This Area button (Explore Mode) ─────────────────────────────── */
+#searchAreaBtn{
+  display:none;
+  position:absolute;
+  top:12px;left:50%;transform:translateX(-50%);
+  z-index:1000;
+  background:var(--panel);
+  color:var(--accent);
+  border:1.5px solid var(--accent);
+  border-radius:20px;
+  padding:7px 18px;
+  font-size:13px;font-weight:600;
+  cursor:pointer;
+  box-shadow:var(--shadow-md);
+  white-space:nowrap;
+  transition:background .15s,color .15s;
+}
+#searchAreaBtn:hover{background:var(--accent);color:#fff;}
+#searchAreaBtn.loading{opacity:.6;pointer-events:none;}
 .spin{
   width:32px;height:32px;
   border:3px solid #dbeafe;
@@ -598,6 +618,7 @@ input::placeholder{color:var(--muted-2)}
 <div id="container">
   <div id="loader"><div class="spin"></div><span id="loaderMsg">Fetching market data…</span></div>
   <div id="map"></div>
+  <button id="searchAreaBtn" onclick="searchThisArea()">⟳ Search This Area</button>
   <div id="legend"><div class="leg-title">Systems</div><div id="legItems"></div></div>
   <div id="rightPanel">
     <div id="tabs">
@@ -877,6 +898,14 @@ function initMap() {
   mapInstance.getPane('targetPane').style.zIndex = 650;
   mapInstance.createPane('defaultPane');
   mapInstance.getPane('defaultPane').style.zIndex = 400;
+
+  // Explore Mode: show "Search This Area" button after user drags/zooms,
+  // but only once a search has been run (lastData is populated).
+  mapInstance.on('moveend', function() {
+    if (!lastData || !lastData.target) return; // no search run yet
+    if (_exploreSearchPending) return;          // programmatic setView — ignore
+    document.getElementById('searchAreaBtn').style.display = 'block';
+  });
 }
 
 // ════════════════════════════════════════════════════════
@@ -3394,6 +3423,69 @@ function setAllFtypes(checked) {
 }
 
 // ════════════════════════════════════════════════════════
+//  EXPLORE MODE — Search This Area
+// ════════════════════════════════════════════════════════
+// Flag to suppress the moveend button when WE programmatically pan the map
+let _exploreSearchPending = false;
+
+async function searchThisArea() {
+  if (!lastData || !lastData.target) return;
+
+  const btn = document.getElementById('searchAreaBtn');
+  const loader = document.getElementById('loader');
+  btn.classList.add('loading');
+  btn.textContent = 'Searching…';
+  loader.classList.add('visible');
+
+  const center = mapInstance.getCenter();
+  const target = lastData.target;
+  const radius = parseInt(document.getElementById('radiusSelect').value, 10);
+  const ftype  = getSelectedFtypes();
+
+  try {
+    setLoaderMsg('Fetching market data…');
+    let facilities;
+    try { facilities = await getFacilities(center.lat, center.lng, radius, ftype); }
+    catch(e) { throw new Error('Hospital data service unreachable. (' + e.message + ')'); }
+
+    facilities = applyExcelFacilities(facilities, center.lat, center.lng, radius, ftype);
+
+    if (!facilities.length) {
+      showError('No facilities found in this area. Try a larger radius.');
+      return;
+    }
+
+    setLoaderMsg('Verifying facility types…');
+    facilities = await enrichWithCMS(facilities);
+
+    resetColors();
+    const systems = groupBySystem(facilities, target);
+    const targetKey = findTargetKey(systems, target);
+    lastData = { systems, target, rawFacilities: facilities };
+
+    // Suppress moveend from our own programmatic pan (none here — user already panned)
+    buildLegend(systems, targetKey);
+    drawMarkers(systems, targetKey);
+    buildInsights();
+    buildAccount();
+    buildAssign();
+    compFilterActive.clear();
+    compFocusModeOn = false;
+    buildCompFilterBar(systems, targetKey);
+    switchTab('insights');
+
+  } catch(err) {
+    showError(err.message);
+    console.error(err);
+  } finally {
+    loader.classList.remove('visible');
+    btn.classList.remove('loading');
+    btn.textContent = '⟳ Search This Area';
+    btn.style.display = 'none'; // hide after search completes
+  }
+}
+
+// ════════════════════════════════════════════════════════
 //  MAIN SEARCH
 // ════════════════════════════════════════════════════════
 async function runSearch() {
@@ -3444,7 +3536,10 @@ async function runSearch() {
     const targetKey = findTargetKey(systems, target);
     lastData = { systems, target, rawFacilities: facilities };
 
+    _exploreSearchPending = true;
     mapInstance.setView([coords.lat, coords.lon], 11);
+    setTimeout(function(){ _exploreSearchPending = false; }, 600);
+    document.getElementById('searchAreaBtn').style.display = 'none';
     buildLegend(systems, targetKey);
     drawMarkers(systems, targetKey);
     buildInsights();
