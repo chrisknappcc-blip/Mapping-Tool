@@ -3797,9 +3797,6 @@ async function runSearch() {
 
   resetColors();
 
-  // Load icon for this target system (silently, in background)
-  loadIconForSystem(target);
-
   const btn    = document.getElementById('runBtn');
   const loader = document.getElementById('loader');
   btn.disabled = true;
@@ -3810,7 +3807,10 @@ async function runSearch() {
     try { coords = await getCoords(zip); }
     catch(e) { throw new Error('Geocoding service unreachable. (' + e.message + ')'); }
     if (!coords) throw new Error(`ZIP "${zip}" not found.`);
-
+    
+    // Load icon in parallel with the search pipeline
+    const iconPromise = loadIconForSystem(target);
+    
 let facilities;
     try { facilities = await getFacilities(coords.lat, coords.lon, radius, ftype); }
     catch(e) { throw new Error('Hospital data service unreachable. (' + e.message + ')'); }
@@ -3837,6 +3837,7 @@ let facilities;
     setTimeout(function(){ _exploreSearchPending = false; }, 600);
     document.getElementById('searchAreaBtn').style.display = 'none';
     buildLegend(systems, targetKey);
+    await iconPromise;
     drawMarkers(systems, targetKey);
     buildInsights();
     buildAccount();
