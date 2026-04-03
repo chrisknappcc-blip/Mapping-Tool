@@ -491,6 +491,24 @@ input::placeholder{color:var(--muted-2)}
 }
 .cfilter-focus-row label { cursor:pointer; font-weight:600; }
 .cfilter-focus-row input[type=checkbox] { accent-color:#d97706; cursor:pointer; }
+
+/* ── Icon Library tab ──────────────────────────────────────────────────── */
+.icon-lib-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:10px;margin-top:4px}
+.icon-lib-card{display:flex;flex-direction:column;align-items:center;gap:6px;background:var(--bg);
+  border:1.5px solid var(--border);border-radius:var(--radius-lg);padding:10px 8px;
+  position:relative;transition:border-color .15s}
+.icon-lib-card:hover{border-color:var(--accent)}
+.icon-lib-card img{width:48px;height:48px;object-fit:contain;border-radius:5px}
+.icon-lib-card .icon-lib-name{font-size:9.5px;font-weight:600;text-align:center;
+  color:var(--text-2);word-break:break-word;line-height:1.3;text-transform:capitalize}
+.icon-lib-del{position:absolute;top:4px;right:4px;background:none;border:none;cursor:pointer;
+  color:var(--muted-2);font-size:12px;line-height:1;padding:2px 4px;border-radius:3px;transition:all .15s}
+.icon-lib-del:hover{background:#fee2e2;color:var(--red)}
+.icon-lib-upload-card{display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:6px;background:var(--bg);border:1.5px dashed var(--border);border-radius:var(--radius-lg);
+  padding:10px 8px;cursor:pointer;transition:border-color .15s,background .15s;min-height:90px}
+.icon-lib-upload-card:hover{border-color:var(--accent);background:#eff6ff}
+.icon-lib-upload-card span{font-size:10px;color:var(--muted);font-weight:600;text-align:center}
 </style>
 </head>
 <body>
@@ -625,10 +643,17 @@ input::placeholder{color:var(--muted-2)}
       <div class="tab active" data-tab="insights" onclick="switchTab('insights')">Insights</div>
       <div class="tab" data-tab="account" onclick="switchTab('account')">Target</div>
       <div class="tab" data-tab="assign" onclick="switchTab('assign')">Assign</div>
+      <div class="tab" data-tab="icons" onclick="switchTab('icons');loadIconLibrary()">Icons</div>
     </div>
     <div id="insights" class="panel active"><p class="empty">Run a search to see insights.</p></div>
     <div id="account" class="panel"><p class="empty">Run a search to see target details.</p></div>
     <div id="assign" class="panel"><p class="empty">Run a search to reassign facilities.</p></div>
+    <div id="icons" class="panel">
+      <div class="sec">System Icon Library</div>
+      <p style="font-size:11px;color:var(--muted);line-height:1.5;margin-bottom:10px">Icons saved here auto-load for all team members when that system is searched. Upload PNG or JPG.</p>
+      <div id="iconLibStatus" style="font-size:11px;color:var(--muted);min-height:16px;margin-bottom:6px"></div>
+      <div class="icon-lib-grid" id="iconLibGrid"><p class="empty">Loading…</p></div>
+    </div>
   </div>
 </div>
 
@@ -878,6 +903,125 @@ async function saveSharedLogo(dataUrl) {
     console.warn('Could not save shared logo: ' + e.message);
   }
 }
+// ════════════════════════════════════════════════════════
+// ICON LIBRARY TAB
+// ════════════════════════════════════════════════════════
+
+async function loadIconLibrary() {
+  const grid   = document.getElementById('iconLibGrid');
+  const status = document.getElementById('iconLibStatus');
+  if (!grid) return;
+
+  grid.innerHTML = '<p class="empty">Loading…</p>';
+  if (status) status.textContent = '';
+
+  try {
+    const res = await fetch('https://eclectic-kitten-27fdf8.netlify.app/.netlify/functions/router?action=icon-list');
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const data = await res.json();
+    const icons = data.icons || [];
+
+    if (!icons.length) {
+      grid.innerHTML = '<p class="empty">No icons saved yet. Upload one below.</p>'
+        + '<label class="icon-lib-upload-card">'
+        + '<span style="font-size:22px">+</span><span>Upload icon</span>'
+        + '<input type="file" accept="image/png,image/jpeg" style="display:none" onchange="uploadLibraryIcon(event)"/>'
+        + '</label>';
+      if (status) status.textContent = '0 icons saved';
+      return;
+    }
+
+    let html = icons.map(function(ic) {
+      const label = ic.system.replace(/_/g, ' ');
+      return '<div class="icon-lib-card" id="icon-card-' + ic.system + '">'
+        + '<button class="icon-lib-del" onclick="deleteLibraryIcon(' + "'" + ic.system + "'" + ')" title="Delete">✕</button>'
+        + '<img src="" data-system="' + ic.system + '" alt="' + label + '" style="opacity:.3" onerror="this.style.opacity='.15'"/>'
+        + '<div class="icon-lib-name">' + label + '</div>'
+        + '</div>';
+    }).join('');
+
+    // Upload card at the end
+    html += '<label class="icon-lib-upload-card" title="Upload new icon">'
+      + '<span style="font-size:22px">+</span>'
+      + '<span>Upload icon</span>'
+      + '<input type="file" accept="image/png,image/jpeg" style="display:none" onchange="uploadLibraryIcon(event)"/>'
+      + '</label>';
+
+    grid.innerHTML = html;
+    if (status) status.textContent = icons.length + ' icon' + (icons.length !== 1 ? 's' : '') + ' saved';
+
+    // Lazy-load image data for each card
+    icons.forEach(async function(ic) {
+      try {
+        const r = await fetch('https://eclectic-kitten-27fdf8.netlify.app/.netlify/functions/router?action=icon-load&system=' + encodeURIComponent(ic.system));
+        if (!r.ok) return;
+        const d = await r.json();
+        if (!d.dataUrl) return;
+        const img = grid.querySelector('img[data-system="' + ic.system + '"]');
+        if (img) { img.src = d.dataUrl; img.style.opacity = '1'; }
+      } catch(e) { /* silent */ }
+    });
+
+  } catch(e) {
+    grid.innerHTML = '<p class="empty">Could not load icons: ' + e.message + '</p>';
+    console.warn('loadIconLibrary failed:', e);
+  }
+}
+
+async function deleteLibraryIcon(system) {
+  if (!confirm('Delete the icon for "' + system.replace(/_/g, ' ') + '"?')) return;
+  const status = document.getElementById('iconLibStatus');
+  if (status) status.textContent = 'Deleting…';
+  try {
+    await fetch('https://eclectic-kitten-27fdf8.netlify.app/.netlify/functions/router?action=icon-clear&system=' + encodeURIComponent(system), { method: 'POST' });
+    const card = document.getElementById('icon-card-' + system);
+    if (card) card.remove();
+    if (status) status.textContent = 'Deleted.';
+    // If this is the currently-active target icon, clear it from memory too
+    const currentTarget = document.getElementById('targetInput') ? document.getElementById('targetInput').value.trim() : '';
+    if (currentTarget) {
+      const currentKey = currentTarget.toLowerCase().trim().replace(/\s+/g, '_');
+      if (currentKey === system) {
+        customIcons.target = null;
+        var prev = document.getElementById('targetIconPreview');
+        if (prev) { prev.src = ''; prev.style.display = 'none'; }
+      }
+    }
+  } catch(e) {
+    if (status) status.textContent = 'Delete failed: ' + e.message;
+  }
+}
+
+async function uploadLibraryIcon(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const status = document.getElementById('iconLibStatus');
+
+  const systemRaw = prompt('Which health system is this icon for?\n(e.g. "Mass General Brigham")');
+  if (!systemRaw || !systemRaw.trim()) { event.target.value = ''; return; }
+  const systemKey = encodeURIComponent(systemRaw.trim().toLowerCase().replace(/\s+/g, '_'));
+
+  if (status) status.textContent = 'Uploading…';
+
+  const reader = new FileReader();
+  reader.onload = async function(ev) {
+    try {
+      const res = await fetch('https://eclectic-kitten-27fdf8.netlify.app/.netlify/functions/router?action=icon-save&system=' + systemKey, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain' },
+        body: ev.target.result
+      });
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      event.target.value = '';
+      if (status) status.textContent = 'Saved! Refreshing…';
+      await loadIconLibrary();
+    } catch(e) {
+      if (status) status.textContent = 'Upload failed: ' + e.message;
+    }
+  };
+  reader.readAsDataURL(file);
+}
+
 
 const SYSTEM_COLORS = ['#2563eb','#16a34a','#9333ea','#ea580c','#0891b2','#be185d','#854d0e','#374151','#0d9488','#7c3aed'];
 const colorMap = {};
@@ -2802,8 +2946,19 @@ function buildAssign() {
     +'</p>'
 
     // Search bar
-    +'<input id="assignSearch" placeholder="🔍  Search facilities…" oninput="filterAssignList(this.value)" '
-      +'style="width:100%;margin-bottom:8px"/>'
+    +'<div id="assignFilterBar" style="display:flex;gap:6px;margin-bottom:8px">'
+    +'<input id="assignSearch" placeholder="🔍 Search facilities…" oninput="filterAssignList()" style="flex:1;min-width:0"/>'
+    +'<select id="assignTypeFilter" onchange="filterAssignList()" title="Filter by type" style="padding:5px 7px;border:1.5px solid var(--border);border-radius:var(--radius);font-family:inherit;font-size:12px;background:#fff;color:var(--text);cursor:pointer">'
+    +'<option value="">All Types</option>'
+    +'<option value="hospital">Hospital</option>'
+    +'<option value="clinic">Clinic</option>'
+    +'<option value="ed">ED</option>'
+    +'<option value="urgent_care">Urgent Care</option>'
+    +'<option value="rehab">Rehab / SNF</option>'
+    +'<option value="outpatient">Outpatient</option>'
+    +'<option value="specialist">Specialist</option>'
+    +'</select>'
+    +'</div>'
 
     // Stats + reset
     +'<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">'
@@ -2838,6 +2993,7 @@ function buildAssign() {
         var stableKey = facObj ? overrideKey(facObj) : String(f.id);
         var currentType = typeOverrides[stableKey]
           || (facObj && facObj._facType)
+          || (facObj && facObj.tags && facObj.tags.name && classifyEmbeddedType(facObj.tags.name))
           || 'clinic';
         var typeOpts = '<option value="hospital"'+(currentType==='hospital'?' selected':'')+'>Hospital</option>'
           +'<option value="clinic"'+(currentType==='clinic'?' selected':'')+'>Clinic</option>'
@@ -2847,7 +3003,7 @@ function buildAssign() {
           +'<option value="outpatient"'+(currentType==='outpatient'?' selected':'')+'>Outpatient</option>'
           +'<option value="specialist"'+(currentType==='specialist'?' selected':'')+'>Specialist</option>';
 
-        return '<div class="assign-row" data-name="'+f.name.toLowerCase()+'" '
+        return '<div class="assign-row" data-name="'+f.name.toLowerCase()+'" data-type="'+currentType+'" '
           +'style="padding:5px 0;border-bottom:1px solid var(--border);'+rowStyle+'">'
           +'<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:4px">'
             +'<div style="font-size:11px;font-weight:600;color:var(--text);'
@@ -3293,10 +3449,15 @@ function applyExcelFacilities(rawFacilities, centerLat, centerLon, radiusMeters,
   return existing.concat(toAdd);
 }
 
-function filterAssignList(query) {
-  const q = query.toLowerCase();
+function filterAssignList() {
+  var searchEl = document.getElementById('assignSearch');
+  var typeEl   = document.getElementById('assignTypeFilter');
+  const q = searchEl ? searchEl.value.toLowerCase() : '';
+  const t = typeEl   ? typeEl.value : '';
   document.querySelectorAll('.assign-row').forEach(function(row) {
-    row.style.display = row.dataset.name.includes(q) ? '' : 'none';
+    const nameMatch = !q || row.dataset.name.includes(q);
+    const typeMatch = !t || row.dataset.type === t;
+    row.style.display = (nameMatch && typeMatch) ? '' : 'none';
   });
 }
 
