@@ -695,30 +695,78 @@ let mapInstance = null;
 let markers = [];
 let lastData = {};
 
-// CMS Provider data — loaded from Azure Blob Storage via API
-let cmsData = null;
-let cmsLoadAttempted = false;
+// CMS enrichment lookup — available as post-search type enrichment.
+// Sends a batch of facility names/states/zips to the router's cms-lookup action,
+// which matches against the CMS Provider of Services index and returns verified
+// _facType values. Falls back silently if the index hasn't been built yet.
+let cmsLookupAvailable = null; // null=unknown, true=yes, false=no
 
-async function loadCMSData() {
-  if (cmsLoadAttempted) return cmsData;
-  cmsLoadAttempted = true;
+async function checkCMSLookup() {
+  if (cmsLookupAvailable !== null) return cmsLookupAvailable;
   try {
-    const res = await fetch('https://eclectic-kitten-27fdf8.netlify.app/.netlify/functions/router?action=cms-data');
-    if (!res.ok) {
-      console.info('CMS data not available (HTTP ' + res.status + ')');
-      return null;
-    }
+    const res = await fetch('https://eclectic-kitten-27fdf8.netlify.app/.netlify/functions/router?action=cms-lookup', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: '[]'
+    });
+    if (!res.ok) { cmsLookupAvailable = false; return false; }
     const data = await res.json();
-    if (data.error) {
-      console.info('CMS data not yet uploaded: ' + data.error);
-      return null;
-    }
-    cmsData = data;
-    console.log('CMS data loaded: ' + cmsData.total + ' facilities across ' + Object.keys(cmsData.by_state).length + ' states');
-    return cmsData;
+    cmsLookupAvailable = !data.note; // note field means index not yet built
+    console.log('CMS lookup index ' + (cmsLookupAvailable ? 'available' : 'not yet built'));
+    return cmsLookupAvailable;
   } catch(e) {
-    console.info('CMS data not available: ' + e.message);
-    return null;
+    console.info('CMS lookup not available: ' + e.message);
+    cmsLookupAvailable = false;
+    return false;
+  }
+}
+
+// Enrich a facilities array with CMS-verified _facType values.
+// Only applies to facilities that don't already have a team type override.
+// Runs silently — failures never block the search result from displaying.
+async function enrichWithCMS(facilities) {
+  if (!facilities || !facilities.length) return facilities;
+  const available = await checkCMSLookup();
+  if (!available) return facilities;
+
+  // Build batch of facilities that could benefit from enrichment:
+  // - have a name, state, and zip
+  // - don't already have a team type override
+  var batch = [];
+  facilities.forEach(function(f) {
+    var key = overrideKey(f);
+    if (typeOverrides[key]) return; // team override takes precedence, skip
+    var name  = (f.tags && f.tags.name)     || '';
+    var state = (f.tags && f.tags.state)    || '';
+    var zip   = (f.tags && f.tags.postcode) || '';
+    if (!name || !state) return;
+    batch.push({ id: overrideKey(f), name: name, state: state, zip: zip });
+  });
+
+  if (!batch.length) return facilities;
+
+  try {
+    const res = await fetch('https://eclectic-kitten-27fdf8.netlify.app/.netlify/functions/router?action=cms-lookup', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(batch)
+    });
+    if (!res.ok) return facilities;
+    const data = await res.json();
+    const matches = data.matches || {};
+    var enriched = 0;
+    facilities.forEach(function(f) {
+      var key = overrideKey(f);
+      if (matches[key]) {
+        f._facType = matches[key];
+        enriched++;
+      }
+    });
+    if (enriched > 0) console.log('CMS enrichment: verified _facType for ' + enriched + ' facilities');
+    return facilities;
+  } catch(e) {
+    console.info('CMS enrichment failed silently: ' + e.message);
+    return facilities;
   }
 }
 const customIcons = { target: null, competitor: null };
@@ -1462,8 +1510,8 @@ function shouldExclude(facility) {
   var healthcare = tags.healthcare || '';
   var name       = tags.name       || '';
 
-  // NPI, CMS, Excel, and manually added facilities are pre-vetted — never exclude
-  if (facility.type === 'npi' || facility.type === 'cms' ||
+  // NPI, Excel, and manually added facilities are pre-vetted — never exclude
+  if (facility.type === 'npi' ||
       facility.type === 'excel' || facility.type === 'manual' ||
       (facility.id && String(facility.id).startsWith('manual_'))) return false;
 
@@ -1494,78 +1542,6 @@ function shouldExclude(facility) {
     if (EXCLUDE_NAME_RX[i].test(name)) return true;
   }
   return false;
-}
-
-// ── CMS Provider of Services ─────────────────────────────
-// Queries the locally-loaded cms_providers.json file
-// No API calls, no rate limits, no CORS issues — pure local lookup
-async function fetchCMSFacilities(lat, lon, radiusMeters, types) {
-  var data = await loadCMSData();
-  if (!data || !data.by_state) return [];
-
-  // Get state(s) to search — include neighboring states for border areas
-  var primaryState = await getStateFromCoords(lat, lon);
-  if (!primaryState) return [];
-
-  // Collect facilities from this state
-  var candidates = data.by_state[primaryState] || [];
-
-  // Also check adjacent states (rough — include all states within ~50 miles)
-  // Simple approach: check all states and filter by distance
-  Object.entries(data.by_state).forEach(function(entry) {
-    if (entry[0] !== primaryState && entry[0] !== 'XX') {
-      // Only scan other states if they have a facility within a reasonable bounding box
-      var sample = entry[1][0];
-      if (sample && haversineMeters(lat, lon, sample.lat, sample.lon) < radiusMeters + 100000) {
-        candidates = candidates.concat(entry[1]);
-      }
-    }
-  });
-
-  // Map our type selections to CMS facility type strings
-  var ALL_TYPES = ['hospital','clinic','ed','outpatient','rehab','urgent_care','specialist'];
-  var selectedTypes = (!types || !types.length || types.length === ALL_TYPES.length) ? ALL_TYPES : types;
-  var typeSet = new Set(selectedTypes);
-
-  // Filter by radius and type
-  var results = [];
-  candidates.forEach(function(f) {
-    if (!f.lat || !f.lon) return;
-    if (haversineMeters(lat, lon, f.lat, f.lon) > radiusMeters) return;
-
-    // Map CMS facility type to our type categories
-    var facType = f.fac_type || 'clinic';
-    // ED is a subset of hospital in CMS
-    if (facType === 'hospital' && typeSet.has('hospital')) {
-      // include
-    } else if (facType === 'hospital' && typeSet.has('ed')) {
-      // include hospitals when ED is selected
-    } else if (!typeSet.has(facType)) {
-      return; // skip types not selected
-    }
-
-    // Convert to our standard facility shape
-    results.push({
-      id:   f.id,
-      type: 'cms',
-      lat:  f.lat,
-      lon:  f.lon,
-      tags: {
-        name:       f.name || 'Unknown',
-        healthcare: 'cms',
-        cms_type:   f.cms_type || '',
-        fac_type:   f.fac_type || '',
-        npi:        f.npi || '',
-        address:    f.addr || '',
-        city:       f.city || '',
-        state:      f.state || '',
-        postcode:   f.zip || ''
-      }
-    });
-  });
-
-  console.log('CMS: ' + results.length + ' facilities within radius from ' + candidates.length + ' state candidates');
-  return results;
 }
 
 // Simple in-memory cache — avoids re-querying on target/display changes
@@ -1633,23 +1609,14 @@ async function getFacilities(lat, lon, radius, types) {
 
   setLoaderMsg('Fetching market data…');
 
-  var osmPromise = queryOverpass(buildOverpassQuery(lat, lon, radius, types))
+  var facilities = await queryOverpass(buildOverpassQuery(lat, lon, radius, types))
     .then(function(raw) { return raw.filter(function(f){ return !shouldExclude(f); }); })
     .catch(function(e) { console.warn('OSM failed:', e.message); return []; });
 
-  var cmsPromise = fetchCMSFacilities(lat, lon, radius, types)
-    .catch(function(e){ console.warn('CMS failed:', e.message); return []; });
+  console.log('OSM: ' + facilities.length + ' facilities');
 
-  var results_arr = await Promise.all([osmPromise, cmsPromise]);
-  var osmFacs = results_arr[0];
-  var cmsFacs = results_arr[1];
-
-  var merged = mergeFacilities(osmFacs, cmsFacs);
-
-  console.log('OSM: '+osmFacs.length+' | CMS: '+cmsFacs.length+' | Merged: '+merged.length);
-
-  facilityCache[cacheKey] = merged;
-  return merged;
+  facilityCache[cacheKey] = facilities;
+  return facilities;
 }
 
 
@@ -2244,8 +2211,6 @@ function drawMarkers(systems, targetKey) {
         var _popName = f.tags&&f.tags.name ? f.tags.name : 'Unknown';
         var _popSrc = f.type==='npi'
           ? '<br/><span style="font-size:10px;color:#94a3b8">NPI'+(f.npiType==='NPI-1'?' (Individual)':' (Org)')+(f.tags.npi_taxonomy_desc?' · '+f.tags.npi_taxonomy_desc:'')+'</span>'
-          : f.type==='cms'
-          ? '<br/><span style="font-size:10px;color:#94a3b8">CMS'+(f.tags.city?' · '+f.tags.city:'')+'</span>'
           : '';
         marker.bindPopup('<strong>'+_popName+'</strong><br/><em style="color:#6b7280">'+sys+'</em>'+_popSrc);
         marker._cpiqSys = sys;
@@ -3469,6 +3434,12 @@ async function runSearch() {
       showError('No facilities found. Try a larger radius or different facility type.');
       return;
     }
+
+    // Enrich facility types using CMS Provider of Services index (silent, non-blocking)
+    // Runs after QHIN/OSM results are in — stamps _facType only where no team override exists.
+    setLoaderMsg('Verifying facility types…');
+    facilities = await enrichWithCMS(facilities);
+
     const systems = groupBySystem(facilities, target);
     const targetKey = findTargetKey(systems, target);
     lastData = { systems, target, rawFacilities: facilities };
