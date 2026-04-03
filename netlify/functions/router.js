@@ -181,6 +181,54 @@ exports.handler = async function(event, context) {
       }
     }
 
+    // ── geocache-get ─────────────────────────────────────────────────────────
+    // Read a single entry from the persistent geocode cache.
+    // ?action=geocache-get&key=zip:02115
+    // Returns { hit: true, lat, lon } or { hit: false }
+    if (action === 'geocache-get') {
+      if (!sasToken) return jsonResponse(500, { error: 'SAS token not configured' });
+      const cacheKey = params.key || '';
+      if (!cacheKey) return jsonResponse(400, { error: 'key param required' });
+      try {
+        const raw = await fetchText(getBlobUrl(sasToken, 'app-state', 'geocode_cache.json'));
+        const cache = JSON.parse(raw);
+        const entry = cache[cacheKey];
+        if (entry && entry.lat && entry.lon) {
+          return jsonResponse(200, { hit: true, lat: entry.lat, lon: entry.lon });
+        }
+        return jsonResponse(200, { hit: false });
+      } catch(err) {
+        if (err.message && err.message.startsWith('404')) return jsonResponse(200, { hit: false });
+        return jsonResponse(502, { error: 'Geocache get failed', detail: err.message });
+      }
+    }
+
+    // ── geocache-set ─────────────────────────────────────────────────────────
+    // Write one or more entries to the persistent geocode cache (read-modify-write).
+    // POST body: JSON object of { key: { lat, lon } } pairs
+    if (action === 'geocache-set') {
+      if (!sasToken) return jsonResponse(500, { error: 'SAS token not configured' });
+      let newEntries;
+      try { newEntries = JSON.parse(event.body || '{}'); } catch(e) { return jsonResponse(400, { error: 'Invalid JSON body' }); }
+      try {
+        let cache = {};
+        try {
+          const raw = await fetchText(getBlobUrl(sasToken, 'app-state', 'geocode_cache.json'));
+          cache = JSON.parse(raw);
+        } catch(e) { /* cache doesn't exist yet — start fresh */ }
+
+        const ts = new Date().toISOString();
+        Object.keys(newEntries).forEach(function(k) {
+          cache[k] = { lat: newEntries[k].lat, lon: newEntries[k].lon, ts: ts };
+        });
+
+        await putText(getBlobUrl(sasToken, 'app-state', 'geocode_cache.json'), JSON.stringify(cache), 'application/json');
+        return jsonResponse(200, { success: true, total_cached: Object.keys(cache).length });
+      } catch(err) {
+        return jsonResponse(500, { error: 'Geocache set failed', detail: err.message });
+      }
+    }
+
     // ── qhin-data ────────────────────────────────────────────────────────────
     if (action === 'qhin-data') {
       if (!sasToken) return jsonResponse(500, { error: 'SAS token not configured' });
