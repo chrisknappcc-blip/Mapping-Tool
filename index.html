@@ -598,8 +598,11 @@ input::placeholder{color:var(--muted-2)}
 <div id="pinBar">
 
   <!-- Target Pin group -->
-  <div class="pin-group">
-    <span class="pin-group-lbl">Target Pin</span>
+  <div class="pin-group" style="border-left:3px solid #e02424;padding-left:8px;background:rgba(224,36,36,0.05);border-radius:0 6px 6px 0">
+    <div style="display:flex;flex-direction:column;gap:4px">
+      <span class="pin-group-lbl" style="color:#e02424;font-weight:700;font-size:10px;letter-spacing:.05em;text-transform:uppercase">📍 Target Pin</span>
+      <span style="font-size:10px;color:var(--muted);white-space:nowrap">Map pin for your target system</span>
+    </div>
     <label>Color <input type="color" id="targetColor" value="#e02424"/></label>
     <label>Size
       <input type="range" id="targetPinSize" min="18" max="60" value="38"
@@ -613,15 +616,21 @@ input::placeholder{color:var(--muted-2)}
     <button class="pin-clear-btn" onclick="clearIcon('target')" title="Clear icon">✕</button>
   </div>
 
-  <!-- Independent group -->
+<!-- Independent group -->
   <div class="pin-group">
     <span class="pin-group-lbl">Independent</span>
     <label>Color <input type="color" id="independentColor" value="#6b7280"/></label>
   </div>
 
+  <!-- Divider -->
+  <div style="width:1px;background:var(--border);margin:0 4px;align-self:stretch;opacity:.5"></div>
+
   <!-- Export Logo group -->
-  <div class="pin-group">
-    <span class="pin-group-lbl">Export Logo</span>
+  <div class="pin-group" style="border-left:3px solid #0891b2;padding-left:8px;background:rgba(8,145,178,0.06);border-radius:0 6px 6px 0">
+    <div style="display:flex;flex-direction:column;gap:4px">
+      <span class="pin-group-lbl" style="color:#0891b2;font-weight:700;font-size:10px;letter-spacing:.05em;text-transform:uppercase">📄 Export Logo</span>
+      <span style="font-size:10px;color:var(--muted);white-space:nowrap">Appears on PDF exports</span>
+    </div>
     <label class="pin-upload-lbl">Upload
       <input type="file" id="ccLogoUpload" accept="image/png,image/jpeg,image/svg+xml" onchange="handleLogoUpload(event)"/>
     </label>
@@ -916,7 +925,8 @@ async function loadIconLibrary() {
   const grid   = document.getElementById('iconLibGrid');
   const status = document.getElementById('iconLibStatus');
   if (!grid) return;
-
+const searchBox = document.getElementById('iconLibSearch');
+  if (searchBox) searchBox.value = '';
   grid.innerHTML = '<p class="empty">Loading…</p>';
   if (status) status.textContent = '';
 
@@ -1025,7 +1035,7 @@ async function uploadLibraryIcon(event) {
     }
   };
   reader.readAsDataURL(file);
-
+}
 function filterIconLibrary(query) {
   const q = query.toLowerCase().trim();
   const cards = document.querySelectorAll('#iconLibGrid .icon-lib-card');
@@ -1254,7 +1264,27 @@ function makeLeafletIcon(dataUrl, size) {
 // Keys are namespaced: zip:XXXXX | reverse:LAT:LON | addr:QUERY_STRING
 
 const API = 'https://eclectic-kitten-27fdf8.netlify.app/.netlify/functions/router';
-
+// ── Search result cache ───────────────────────────────────────────────────────
+function buildSearchCacheKey(zip, radiusMeters, types) {
+  return zip + '|' + radiusMeters + '|' + [...types].sort().join(',');
+}
+async function getSearchCache(key) {
+  try {
+    const res = await fetch(API + '?action=search-cache-get&key=' + encodeURIComponent(key));
+    if (!res.ok) return null;
+    const data = await res.json();
+    return data.hit ? data.facilities : null;
+  } catch(e) { return null; }
+}
+function setSearchCache(key, facilities) {
+  fetch(API + '?action=search-cache-set', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ key: key, facilities: facilities })
+  }).then(function(r) {
+    if (r.ok) console.log('Search cached: ' + key);
+  }).catch(function(e) { console.info('Search cache write failed (non-critical):', e.message); });
+}
 const GeocodeCache = {
   _mem: {},  // in-memory layer — survives tab session
 
@@ -3781,7 +3811,11 @@ async function runSearch() {
     catch(e) { throw new Error('Geocoding service unreachable. (' + e.message + ')'); }
     if (!coords) throw new Error(`ZIP "${zip}" not found.`);
 
-    let facilities;
+    
+    // Load icon in parallel with the search pipeline
+    const iconPromise = loadIconForSystem(target);
+    
+let facilities;
     try { facilities = await getFacilities(coords.lat, coords.lon, radius, ftype); }
     catch(e) { throw new Error('Hospital data service unreachable. (' + e.message + ')'); }
 
@@ -3807,6 +3841,7 @@ async function runSearch() {
     setTimeout(function(){ _exploreSearchPending = false; }, 600);
     document.getElementById('searchAreaBtn').style.display = 'none';
     buildLegend(systems, targetKey);
+    await iconPromise;
     drawMarkers(systems, targetKey);
     buildInsights();
     buildAccount();
