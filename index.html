@@ -1078,16 +1078,70 @@ function makeLeafletIcon(dataUrl, size) {
 }
 
 // ════════════════════════════════════════════════════════
+//  GEOCODE CACHE
+// ════════════════════════════════════════════════════════
+// Two-layer cache: in-memory (instant, session-only) + Blob Storage (persistent).
+// Read order: memory → Blob → Nominatim (live).
+// Write: on every live Nominatim hit, write-back to both layers asynchronously.
+// Keys are namespaced: zip:XXXXX | reverse:LAT:LON | addr:QUERY_STRING
+
+const API = 'https://eclectic-kitten-27fdf8.netlify.app/.netlify/functions/router';
+
+const GeocodeCache = {
+  _mem: {},  // in-memory layer — survives tab session
+
+  _key: function(type, val) {
+    return type + ':' + String(val).toLowerCase().trim();
+  },
+
+  // Attempt to read from memory, then Blob
+  get: async function(key) {
+    if (this._mem[key]) return this._mem[key];
+    try {
+      const res = await fetch(API + '?action=geocache-get&key=' + encodeURIComponent(key));
+      if (!res.ok) return null;
+      const data = await res.json();
+      if (data.hit) {
+        const entry = { lat: data.lat, lon: data.lon };
+        this._mem[key] = entry;  // populate memory layer
+        return entry;
+      }
+    } catch(e) { /* cache miss is fine */ }
+    return null;
+  },
+
+  // Write to memory immediately; write to Blob asynchronously (fire-and-forget)
+  set: function(key, lat, lon) {
+    this._mem[key] = { lat, lon };
+    // Async write-back — never blocks the calling function
+    fetch(API + '?action=geocache-set', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ [key]: { lat, lon } })
+    }).catch(function(e) { console.info('Geocache write-back failed (non-critical):', e.message); });
+  }
+};
+
+// ════════════════════════════════════════════════════════
 //  DATA FETCHING
 // ════════════════════════════════════════════════════════
 
 // ── Geocoding ────────────────────────────────────────────
 async function getCoords(zip) {
-  const url = 'https://eclectic-kitten-27fdf8.netlify.app/.netlify/functions/router?action=geocode-proxy&postalcode=' + encodeURIComponent(zip) + '&country=USA&limit=1';
+  const key = GeocodeCache._key('zip', zip);
+  const cached = await GeocodeCache.get(key);
+  if (cached) {
+    console.log('Geocache hit (zip): ' + zip);
+    return { lat: cached.lat, lon: cached.lon };
+  }
+  const url = API + '?action=geocode-proxy&postalcode=' + encodeURIComponent(zip) + '&country=USA&limit=1';
   const res = await fetch(url, { headers: {'Accept-Language':'en'} });
   if (!res.ok) throw new Error('Geocoding HTTP ' + res.status);
   const data = await res.json();
-  return data[0] ? { lat: parseFloat(data[0].lat), lon: parseFloat(data[0].lon) } : null;
+  if (!data[0]) return null;
+  const lat = parseFloat(data[0].lat), lon = parseFloat(data[0].lon);
+  GeocodeCache.set(key, lat, lon);
+  return { lat, lon };
 }
 
 // ── Overpass (OSM) ───────────────────────────────────────
@@ -1215,14 +1269,32 @@ const NPI_TAXONOMY = {
 // NPI API doesn't support radius search — we search by state derived from ZIP geocode
 // and filter results by distance ourselves
 async function getStateFromCoords(lat, lon) {
+  // Cache key uses 2dp precision — state doesn't change within a few miles
+  var cLat = lat.toFixed(2), cLon = lon.toFixed(2);
+  var key = GeocodeCache._key('reverse', cLat + ':' + cLon);
+  var cached = await GeocodeCache.get(key);
+  if (cached && cached.state) {
+    console.log('Geocache hit (reverse state): ' + cLat + ',' + cLon);
+    return cached.state;
+  }
   try {
-    const url = 'https://eclectic-kitten-27fdf8.netlify.app/.netlify/functions/router?action=geocode-proxy&lat=' + lat + '&lon=' + lon + '&zoom=5';
+    const url = API + '?action=geocode-proxy&lat=' + lat + '&lon=' + lon + '&zoom=5';
     const res = await fetch(url, { headers: {'Accept-Language':'en'} });
     if (!res.ok) return null;
     const data = await res.json();
-    return data.address && data.address['ISO3166-2-lvl4']
+    var state = data.address && data.address['ISO3166-2-lvl4']
       ? data.address['ISO3166-2-lvl4'].replace('US-','')
       : (data.address && data.address.state_code ? data.address.state_code : null);
+    if (state) {
+      // Store state in cache alongside lat/lon (repurpose lat/lon fields, add state)
+      GeocodeCache._mem[key] = { lat: lat, lon: lon, state: state };
+      fetch(API + '?action=geocache-set', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ [key]: { lat: lat, lon: lon, state: state } })
+      }).catch(function(e) { console.info('Geocache write-back failed:', e.message); });
+    }
+    return state;
   } catch(e) { return null; }
 }
 
@@ -1312,12 +1384,21 @@ function npiToFacility(npi, lat, lon, enumerationType) {
 // Batched with a small delay to respect rate limits
 async function geocodeAddress(addr, city, state, zip) {
   var q = [addr, city, state, zip].filter(Boolean).join(', ') + ', USA';
+  var key = GeocodeCache._key('addr', q);
+  var cached = await GeocodeCache.get(key);
+  if (cached) {
+    console.log('Geocache hit (addr): ' + q.substring(0, 40));
+    return { lat: cached.lat, lon: cached.lon };
+  }
   try {
-    var url = 'https://eclectic-kitten-27fdf8.netlify.app/.netlify/functions/router?action=geocode-proxy&q=' + encodeURIComponent(q) + '&limit=1&countrycodes=us';
+    var url = API + '?action=geocode-proxy&q=' + encodeURIComponent(q) + '&limit=1&countrycodes=us';
     var res = await fetch(url, { headers: {'Accept-Language':'en'} });
     if (!res.ok) return null;
     var data = await res.json();
-    return data[0] ? { lat: parseFloat(data[0].lat), lon: parseFloat(data[0].lon) } : null;
+    if (!data[0]) return null;
+    var lat = parseFloat(data[0].lat), lon = parseFloat(data[0].lon);
+    GeocodeCache.set(key, lat, lon);
+    return { lat, lon };
   } catch(e) { return null; }
 }
 
