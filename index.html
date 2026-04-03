@@ -916,7 +916,8 @@ async function loadIconLibrary() {
   const grid   = document.getElementById('iconLibGrid');
   const status = document.getElementById('iconLibStatus');
   if (!grid) return;
-
+const searchBox = document.getElementById('iconLibSearch');
+  if (searchBox) searchBox.value = '';
   grid.innerHTML = '<p class="empty">Loading…</p>';
   if (status) status.textContent = '';
 
