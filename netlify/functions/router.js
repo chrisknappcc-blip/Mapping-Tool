@@ -423,7 +423,31 @@ exports.handler = async function(event, context) {
         });
         var output = JSON.stringify({ total: facilities.length, built: new Date().toISOString(), by_state: byState });
         await putText(getBlobUrl(sasToken, 'cms-data', 'cms_providers.json'), output, 'application/json');
-        return jsonResponse(200, { success: true, facilities: facilities.length, skipped: skipped, states: Object.keys(byState).length });
+
+        // Build lookup index: keyed by "STATE|ZIP5|normalizedName" -> _facType
+        // Used by cms-lookup for post-load enrichment (no coordinates needed)
+        function normalizeName(n) {
+          return n.toLowerCase()
+            .replace(/[^a-z0-9 ]/g, '')
+            .replace(/\b(the|of|and|at|a|an|for|center|centre|medical|health|care|hospital|clinic|system|services|inc|llc|corp)\b/g, '')
+            .replace(/\s+/g, ' ').trim();
+        }
+        var lookup = {};
+        facilities.forEach(function(f) {
+          var st  = f.tags.state || '';
+          var zip = (f.tags.postcode || '').substring(0, 5);
+          var nm  = normalizeName(f.tags.name || '');
+          if (!st || !nm) return;
+          // Index by state+zip+name and also state+name (zip may differ by a digit)
+          var key1 = st + '|' + zip + '|' + nm;
+          var key2 = st + '||' + nm;
+          if (!lookup[key1]) lookup[key1] = f._facType;
+          if (!lookup[key2]) lookup[key2] = f._facType; // first match wins
+        });
+        var lookupOutput = JSON.stringify({ built: new Date().toISOString(), index: lookup });
+        await putText(getBlobUrl(sasToken, 'cms-data', 'cms_lookup.json'), lookupOutput, 'application/json');
+
+        return jsonResponse(200, { success: true, facilities: facilities.length, skipped: skipped, states: Object.keys(byState).length, lookup_keys: Object.keys(lookup).length });
       } catch(err) {
         return jsonResponse(500, { error: 'CMS build failed', detail: err.message });
       }
@@ -440,6 +464,49 @@ exports.handler = async function(event, context) {
           return jsonResponse(200, { error: 'CMS data not yet uploaded', total: 0, by_state: {} });
         }
         return jsonResponse(502, { error: 'CMS load failed', detail: err.message });
+      }
+    }
+
+    // ── cms-lookup ───────────────────────────────────────────────────────────
+    // Loads the cms_lookup.json index and matches a batch of facilities by
+    // name + state + zip, returning verified _facType values for enrichment.
+    // POST body: JSON array of { id, name, state, zip }
+    // Returns: { matches: { id: _facType } }
+    if (action === 'cms-lookup') {
+      if (!sasToken) return jsonResponse(500, { error: 'SAS token not configured' });
+      try {
+        const raw = await fetchText(getBlobUrl(sasToken, 'cms-data', 'cms_lookup.json'));
+        const data = JSON.parse(raw);
+        const index = data.index || {};
+
+        function normalizeName(n) {
+          return n.toLowerCase()
+            .replace(/[^a-z0-9 ]/g, '')
+            .replace(/\b(the|of|and|at|a|an|for|center|centre|medical|health|care|hospital|clinic|system|services|inc|llc|corp)\b/g, '')
+            .replace(/\s+/g, ' ').trim();
+        }
+
+        let batch;
+        try { batch = JSON.parse(event.body || '[]'); } catch(e) { batch = []; }
+        if (!Array.isArray(batch)) return jsonResponse(400, { error: 'Body must be JSON array' });
+
+        const matches = {};
+        batch.forEach(function(f) {
+          if (!f.id || !f.name) return;
+          var st  = (f.state || '').toUpperCase();
+          var zip = (f.zip  || '').substring(0, 5);
+          var nm  = normalizeName(f.name);
+          // Try state+zip+name first, then state+name fallback
+          var hit = index[st + '|' + zip + '|' + nm] || index[st + '||' + nm];
+          if (hit) matches[f.id] = hit;
+        });
+
+        return jsonResponse(200, { matches: matches, queried: batch.length, matched: Object.keys(matches).length });
+      } catch(err) {
+        if (err.message && err.message.startsWith('404')) {
+          return jsonResponse(200, { matches: {}, queried: 0, matched: 0, note: 'CMS lookup index not yet built — run build-cms first' });
+        }
+        return jsonResponse(502, { error: 'CMS lookup failed', detail: err.message });
       }
     }
 
