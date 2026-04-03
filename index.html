@@ -935,7 +935,7 @@ async function loadIconLibrary() {
       const label = ic.system.replace(/_/g, ' ');
       return '<div class="icon-lib-card" id="icon-card-' + ic.system + '">'
         + '<button class="icon-lib-del" onclick="deleteLibraryIcon(' + "'" + ic.system + "'" + ')" title="Delete">✕</button>'
-        + '<img src="" data-system="' + ic.system + '" alt="' + label + '" style="opacity:.3" onerror="this.style.opacity='.15'"/>'
+        + '<img src="" data-system="' + ic.system + '" alt="' + label + '" style="opacity:.3" onerror="this.style.opacity=0.15"/>'
         + '<div class="icon-lib-name">' + label + '</div>'
         + '</div>';
     }).join('');
