@@ -117,24 +117,18 @@ function parseCSVLine(line) {
 
 
 // ── Icon index helpers ────────────────────────────────────────────────────────
-// icon-index.json is a simple JSON array of system key strings stored in logos/.
-// This avoids needing the List permission on the SAS token.
-// Format: ["mass_general_brigham", "beth_israel_lahey", ...]
-
 async function readIconIndex(sasToken) {
   try {
     const raw = await fetchText(getBlobUrl(sasToken, 'logos', 'icon-index.json'));
     const parsed = JSON.parse(raw);
     return Array.isArray(parsed) ? parsed : [];
   } catch(e) {
-    // 404 means no icons saved yet — return empty list, not an error
     if (e.message && e.message.startsWith('404')) return [];
     throw e;
   }
 }
 
 async function updateIconIndex(sasToken, system, op) {
-  // op: 'add' | 'remove'
   let systems = [];
   try { systems = await readIconIndex(sasToken); } catch(e) { /* start fresh */ }
   if (op === 'add') {
@@ -148,9 +142,142 @@ async function updateIconIndex(sasToken, system, op) {
 let qhinCache = null, qhinCacheTime = 0;
 const CACHE_TTL = 60 * 60 * 1000;
 
+// ── Referral Flow Model Constants ─────────────────────────────────────────────
+// Based on Care Continuity ED-to-Specialist Value Model (50k patient base).
+// These are the fixed assumptions from the spreadsheet model. All margin figures
+// are per-referral-completion values derived from the 100k ED visit baseline,
+// scaled to 50k for the demo pool.
+const REFERRAL_MODEL = {
+  totalPool: 50000,
+  edVisitRate: 0.82,          // 82% of visits become discharges
+  referralRate: 0.23,          // 23% of discharges referred to targeted specialties
+  baseCompletionRate: 0.40,    // 40% current in-network completion rate
+  specialties: {
+    cardiovascular:    { share: 0.16, opMargin: 218,  ipMargin: 7228, surgMargin: 4749, opRate: 0.11, ipRate: 0.05, surgRate: 0.02 },
+    gastroenterology:  { share: 0.18, opMargin: 205,  ipMargin: 6771, surgMargin: 864,  opRate: 0.12, ipRate: 0.09, surgRate: 0.06 },
+    generalMedicine:   { share: 0.12, opMargin: 96,   ipMargin: 5001, surgMargin: 1501, opRate: 0.36, ipRate: 0.06, surgRate: 0.05 },
+    neurosciences:     { share: 0.04, opMargin: 336,  ipMargin: 5361, surgMargin: 1000, opRate: 0.52, ipRate: 0.37, surgRate: 0.02 },
+    orthopedics:       { share: 0.28, opMargin: 239,  ipMargin: 3865, surgMargin: 1000, opRate: 0.83, ipRate: 0.14, surgRate: 0.05 },
+    spine:             { share: 0.03, opMargin: 212,  ipMargin: 7201, surgMargin: 7004, opRate: 0.98, ipRate: 0.10, surgRate: 0.02 },
+    surgeryENT:        { share: 0.05, opMargin: 121,  ipMargin: 2500, surgMargin: 2500, opRate: 0.04, ipRate: 0.02, surgRate: 0.02 },
+    surgeryGeneral:    { share: 0.08, opMargin: 127,  ipMargin: 8467, surgMargin: 3968, opRate: 0.14, ipRate: 0.22, surgRate: 0.08 },
+    surgeryUrology:    { share: 0.06, opMargin: 110,  ipMargin: 6344, surgMargin: 2650, opRate: 0.61, ipRate: 0.09, surgRate: 0.09 }
+  }
+};
+
+// Compute referral flow data for a set of competitor systems.
+// competitorSystems: array of { name, marketShare, lat, lon, facilityId }
+// targetSystem: { name, lat, lon }
+// Returns the full referral flow payload stored as referral_flows.json per system.
+function computeReferralFlows(targetSystem, competitorSystems) {
+  const pool = REFERRAL_MODEL.totalPool;
+  const edDischarges = Math.round(pool * REFERRAL_MODEL.edVisitRate);
+  const totalReferrals = Math.round(edDischarges * REFERRAL_MODEL.referralRate);
+  const completedInNetwork = Math.round(totalReferrals * REFERRAL_MODEL.baseCompletionRate);
+  const totalLost = totalReferrals - completedInNetwork;
+
+  // Normalize competitor market shares to sum to 1.0 so leakage distribution is clean.
+  const totalShare = competitorSystems.reduce(function(sum, c) { return sum + (c.marketShare || 0); }, 0);
+  const normalizedCompetitors = competitorSystems.map(function(c) {
+    return Object.assign({}, c, { normalizedShare: totalShare > 0 ? (c.marketShare || 0) / totalShare : 1 / competitorSystems.length });
+  });
+
+  // Build per-specialty breakdown.
+  const specialtyFlows = {};
+  var totalMarginAtRisk = 0;
+
+  Object.keys(REFERRAL_MODEL.specialties).forEach(function(key) {
+    const spec = REFERRAL_MODEL.specialties[key];
+    const specReferrals = Math.round(totalReferrals * spec.share);
+    const specCompleted = Math.round(specReferrals * REFERRAL_MODEL.baseCompletionRate);
+    const specLost = specReferrals - specCompleted;
+
+    // Downstream margin at risk = lost referrals * downstream utilization * margin per visit type
+    const opMarginAtRisk    = specLost * spec.opRate   * spec.opMargin;
+    const ipMarginAtRisk    = specLost * spec.ipRate   * spec.ipMargin;
+    const surgMarginAtRisk  = specLost * spec.surgRate * spec.surgMargin;
+    const totalSpecMargin   = opMarginAtRisk + ipMarginAtRisk + surgMarginAtRisk;
+    totalMarginAtRisk += totalSpecMargin;
+
+    // Distribute lost referrals across competitors by normalized market share.
+    const competitorAllocations = normalizedCompetitors.map(function(c) {
+      return {
+        facilityId:   c.facilityId || null,
+        name:         c.name,
+        lat:          c.lat,
+        lon:          c.lon,
+        marketShare:  c.marketShare,
+        lostReferrals: Math.round(specLost * c.normalizedShare),
+        marginAtRisk: Math.round(totalSpecMargin * c.normalizedShare)
+      };
+    });
+
+    specialtyFlows[key] = {
+      displayName:         formatSpecialtyName(key),
+      totalReferrals:      specReferrals,
+      completedInNetwork:  specCompleted,
+      lostReferrals:       specLost,
+      leakageRate:         specLost / specReferrals,
+      marginAtRisk:        Math.round(totalSpecMargin),
+      competitorAllocations: competitorAllocations
+    };
+  });
+
+  // Build top-level competitor summary (aggregate across all specialties).
+  const competitorSummary = normalizedCompetitors.map(function(c) {
+    var totalLostToComp = 0, totalMarginToComp = 0;
+    Object.values(specialtyFlows).forEach(function(sf) {
+      const alloc = sf.competitorAllocations.find(function(a) { return a.name === c.name; });
+      if (alloc) {
+        totalLostToComp  += alloc.lostReferrals;
+        totalMarginToComp += alloc.marginAtRisk;
+      }
+    });
+    return {
+      facilityId:   c.facilityId || null,
+      name:         c.name,
+      lat:          c.lat,
+      lon:          c.lon,
+      marketShare:  c.marketShare,
+      totalLostReferrals: totalLostToComp,
+      totalMarginAtRisk:  totalMarginToComp,
+      leakageShare: totalLostToComp / totalLost
+    };
+  });
+
+  return {
+    generatedAt:        new Date().toISOString(),
+    targetSystem:       targetSystem.name,
+    targetLat:          targetSystem.lat,
+    targetLon:          targetSystem.lon,
+    patientPool:        pool,
+    totalReferrals:     totalReferrals,
+    completedInNetwork: completedInNetwork,
+    totalLost:          totalLost,
+    overallLeakageRate: totalLost / totalReferrals,
+    totalMarginAtRisk:  Math.round(totalMarginAtRisk),
+    specialtyFlows:     specialtyFlows,
+    competitorSummary:  competitorSummary
+  };
+}
+
+function formatSpecialtyName(key) {
+  const names = {
+    cardiovascular:   'Cardiovascular',
+    gastroenterology: 'Gastroenterology',
+    generalMedicine:  'General Medicine',
+    neurosciences:    'Neurosciences',
+    orthopedics:      'Orthopedics',
+    spine:            'Spine',
+    surgeryENT:       'Surgery — ENT',
+    surgeryGeneral:   'Surgery — General',
+    surgeryUrology:   'Surgery — Urology'
+  };
+  return names[key] || key;
+}
+
 // ── Netlify Function handler ───────────────────────────────────────────────────
 exports.handler = async function(event, context) {
-  // Handle CORS preflight
   if (event.httpMethod === 'OPTIONS') {
     return {
       statusCode: 200,
@@ -212,9 +339,6 @@ exports.handler = async function(event, context) {
     }
 
     // ── geocache-get ─────────────────────────────────────────────────────────
-    // Read a single entry from the persistent geocode cache.
-    // ?action=geocache-get&key=zip:02115
-    // Returns { hit: true, lat, lon } or { hit: false }
     if (action === 'geocache-get') {
       if (!sasToken) return jsonResponse(500, { error: 'SAS token not configured' });
       const cacheKey = params.key || '';
@@ -234,8 +358,6 @@ exports.handler = async function(event, context) {
     }
 
     // ── geocache-set ─────────────────────────────────────────────────────────
-    // Write one or more entries to the persistent geocode cache (read-modify-write).
-    // POST body: JSON object of { key: { lat, lon } } pairs
     if (action === 'geocache-set') {
       if (!sasToken) return jsonResponse(500, { error: 'SAS token not configured' });
       let newEntries;
@@ -245,13 +367,11 @@ exports.handler = async function(event, context) {
         try {
           const raw = await fetchText(getBlobUrl(sasToken, 'app-state', 'geocode_cache.json'));
           cache = JSON.parse(raw);
-        } catch(e) { /* cache doesn't exist yet — start fresh */ }
-
+        } catch(e) { /* cache doesn't exist yet */ }
         const ts = new Date().toISOString();
         Object.keys(newEntries).forEach(function(k) {
           cache[k] = { lat: newEntries[k].lat, lon: newEntries[k].lon, ts: ts };
         });
-
         await putText(getBlobUrl(sasToken, 'app-state', 'geocode_cache.json'), JSON.stringify(cache), 'application/json');
         return jsonResponse(200, { success: true, total_cached: Object.keys(cache).length });
       } catch(err) {
@@ -372,7 +492,6 @@ exports.handler = async function(event, context) {
         if (!matches) return jsonResponse(400, { error: 'Invalid data URL' });
         const buffer = Buffer.from(matches[2], 'base64');
         await putBinary(getBlobUrl(sasToken, 'logos', blobName), buffer, matches[1]);
-        // Update icon index
         await updateIconIndex(sasToken, system, 'add');
         return jsonResponse(200, { success: true, bytes: buffer.length, system: system });
       } catch(err) {
@@ -387,7 +506,6 @@ exports.handler = async function(event, context) {
       const blobName = 'icon-' + system.replace(/[^a-z0-9-]/g, '_');
       try {
         await putBinary(getBlobUrl(sasToken, 'logos', blobName), Buffer.alloc(0), 'image/png');
-        // Update icon index
         await updateIconIndex(sasToken, system, 'remove');
         return jsonResponse(200, { success: true });
       } catch(err) {
@@ -435,7 +553,6 @@ exports.handler = async function(event, context) {
     }
 
     // ── cms-columns ──────────────────────────────────────────────────────────
-    // Diagnostic: shows what columns CMS API actually returns
     if (action === 'cms-columns') {
       try {
         const cmsUrl = 'https://data.cms.gov/sites/default/files/2026-01/c500f848-83b3-4f29-a677-562243a2f23b/Hospital_and_other.DATA.Q4_2025.csv';
@@ -505,9 +622,6 @@ exports.handler = async function(event, context) {
         });
         var output = JSON.stringify({ total: facilities.length, built: new Date().toISOString(), by_state: byState });
         await putText(getBlobUrl(sasToken, 'cms-data', 'cms_providers.json'), output, 'application/json');
-
-        // Build lookup index: keyed by "STATE|ZIP5|normalizedName" -> _facType
-        // Used by cms-lookup for post-load enrichment (no coordinates needed)
         function normalizeName(n) {
           return n.toLowerCase()
             .replace(/[^a-z0-9 ]/g, '')
@@ -520,15 +634,13 @@ exports.handler = async function(event, context) {
           var zip = (f.tags.postcode || '').substring(0, 5);
           var nm  = normalizeName(f.tags.name || '');
           if (!st || !nm) return;
-          // Index by state+zip+name and also state+name (zip may differ by a digit)
           var key1 = st + '|' + zip + '|' + nm;
           var key2 = st + '||' + nm;
           if (!lookup[key1]) lookup[key1] = f._facType;
-          if (!lookup[key2]) lookup[key2] = f._facType; // first match wins
+          if (!lookup[key2]) lookup[key2] = f._facType;
         });
         var lookupOutput = JSON.stringify({ built: new Date().toISOString(), index: lookup });
         await putText(getBlobUrl(sasToken, 'cms-data', 'cms_lookup.json'), lookupOutput, 'application/json');
-
         return jsonResponse(200, { success: true, facilities: facilities.length, skipped: skipped, states: Object.keys(byState).length, lookup_keys: Object.keys(lookup).length });
       } catch(err) {
         return jsonResponse(500, { error: 'CMS build failed', detail: err.message });
@@ -550,39 +662,30 @@ exports.handler = async function(event, context) {
     }
 
     // ── cms-lookup ───────────────────────────────────────────────────────────
-    // Loads the cms_lookup.json index and matches a batch of facilities by
-    // name + state + zip, returning verified _facType values for enrichment.
-    // POST body: JSON array of { id, name, state, zip }
-    // Returns: { matches: { id: _facType } }
     if (action === 'cms-lookup') {
       if (!sasToken) return jsonResponse(500, { error: 'SAS token not configured' });
       try {
         const raw = await fetchText(getBlobUrl(sasToken, 'cms-data', 'cms_lookup.json'));
         const data = JSON.parse(raw);
         const index = data.index || {};
-
         function normalizeName(n) {
           return n.toLowerCase()
             .replace(/[^a-z0-9 ]/g, '')
             .replace(/\b(the|of|and|at|a|an|for|center|centre|medical|health|care|hospital|clinic|system|services|inc|llc|corp)\b/g, '')
             .replace(/\s+/g, ' ').trim();
         }
-
         let batch;
         try { batch = JSON.parse(event.body || '[]'); } catch(e) { batch = []; }
         if (!Array.isArray(batch)) return jsonResponse(400, { error: 'Body must be JSON array' });
-
         const matches = {};
         batch.forEach(function(f) {
           if (!f.id || !f.name) return;
           var st  = (f.state || '').toUpperCase();
           var zip = (f.zip  || '').substring(0, 5);
           var nm  = normalizeName(f.name);
-          // Try state+zip+name first, then state+name fallback
           var hit = index[st + '|' + zip + '|' + nm] || index[st + '||' + nm];
           if (hit) matches[f.id] = hit;
         });
-
         return jsonResponse(200, { matches: matches, queried: batch.length, matched: Object.keys(matches).length });
       } catch(err) {
         if (err.message && err.message.startsWith('404')) {
@@ -592,10 +695,7 @@ exports.handler = async function(event, context) {
       }
     }
 
-
-    // ── icon-list ────────────────────────────────────────────────────────────────────────
-    // Lists icons by reading icon-index.json from Blob (avoids needing List permission on SAS token).
-    // Returns: { icons: [ { system: "mass_general_brigham", blobName: "icon-mass_general_brigham" }, ... ] }
+    // ── icon-list ────────────────────────────────────────────────────────────
     if (action === 'icon-list') {
       if (!sasToken) return jsonResponse(500, { error: 'SAS token not configured' });
       try {
@@ -608,7 +708,8 @@ exports.handler = async function(event, context) {
         return jsonResponse(502, { error: 'Icon list failed', detail: err.message });
       }
     }
-// ── search-cache-get ──────────────────────────────────────────────────────
+
+    // ── search-cache-get ──────────────────────────────────────────────────────
     if (action === 'search-cache-get') {
       if (!sasToken) return jsonResponse(500, { error: 'SAS token not configured' });
       const cacheKey = params.key || '';
@@ -651,6 +752,85 @@ exports.handler = async function(event, context) {
         return jsonResponse(500, { error: 'Search cache set failed', detail: err.message });
       }
     }
+
+    // ── referral-flows-compute ────────────────────────────────────────────────
+    // Computes referral flow data for a target system against a set of competitors,
+    // caches the result to Blob Storage, and returns it.
+    // POST body: {
+    //   targetSystem: { name, lat, lon },
+    //   competitors: [ { name, marketShare, lat, lon, facilityId? }, ... ],
+    //   forceRefresh: boolean  (optional — skip cache and recompute)
+    // }
+    if (action === 'referral-flows-compute') {
+      if (!sasToken) return jsonResponse(500, { error: 'SAS token not configured' });
+      let body;
+      try { body = JSON.parse(event.body || '{}'); } catch(e) {
+        return jsonResponse(400, { error: 'Invalid JSON body' });
+      }
+      const { targetSystem, competitors, forceRefresh } = body;
+      if (!targetSystem || !targetSystem.name) return jsonResponse(400, { error: 'targetSystem.name required' });
+      if (!Array.isArray(competitors) || competitors.length === 0) return jsonResponse(400, { error: 'competitors array required' });
+
+      // Build a stable cache key from target name + sorted competitor names.
+      const cacheKey = 'flows_' + targetSystem.name.toLowerCase().replace(/[^a-z0-9]/g, '_')
+        + '_' + competitors.map(function(c) { return c.name; }).sort().join('_').toLowerCase().replace(/[^a-z0-9_]/g, '_').substring(0, 80);
+      const blobName = cacheKey + '.json';
+
+      // Try cache first unless forceRefresh requested.
+      if (!forceRefresh) {
+        try {
+          const cached = await fetchText(getBlobUrl(sasToken, 'referral-flows', blobName));
+          const parsed = JSON.parse(cached);
+          // Return cached result with a flag so client knows it was cached.
+          return jsonResponse(200, Object.assign({ _cached: true }, parsed));
+        } catch(e) {
+          // Cache miss or 404 — compute fresh below.
+        }
+      }
+
+      // Compute fresh.
+      const flowData = computeReferralFlows(targetSystem, competitors);
+
+      // Persist to blob for next time.
+      try {
+        await putText(getBlobUrl(sasToken, 'referral-flows', blobName), JSON.stringify(flowData), 'application/json');
+      } catch(e) {
+        console.warn('Could not cache referral flows: ' + e.message);
+        // Non-fatal — still return the computed data.
+      }
+
+      return jsonResponse(200, Object.assign({ _cached: false }, flowData));
+    }
+
+    // ── referral-flows-load ───────────────────────────────────────────────────
+    // Loads a previously computed referral flow blob by target system name.
+    // Useful for the standalone HubSpot modal to fetch without recomputing.
+    // ?action=referral-flows-load&system=mass_general_brigham
+    if (action === 'referral-flows-load') {
+      if (!sasToken) return jsonResponse(500, { error: 'SAS token not configured' });
+      const systemKey = (params.system || '').toLowerCase().replace(/[^a-z0-9]/g, '_');
+      if (!systemKey) return jsonResponse(400, { error: 'system param required' });
+      // List all blobs matching this system prefix by trying the blob directly.
+      // The client is expected to pass the full cache key, or just the system name
+      // to get the most recently computed flows for that system.
+      const blobName = 'flows_' + systemKey + '_latest.json';
+      try {
+        const raw = await fetchText(getBlobUrl(sasToken, 'referral-flows', blobName));
+        return { statusCode: 200, headers: Object.assign({ 'Content-Type': 'application/json' }, CORS_HEADERS), body: raw };
+      } catch(err) {
+        if (err.message && err.message.startsWith('404')) {
+          return jsonResponse(404, { error: 'No referral flows found for system: ' + systemKey + '. Run referral-flows-compute first.' });
+        }
+        return jsonResponse(502, { error: 'Referral flows load failed', detail: err.message });
+      }
+    }
+
+    // ── referral-flows-save-latest ────────────────────────────────────────────
+    // After computing flows, also write a "latest" alias blob so the standalone
+    // modal can always fetch the most recent computation for a system without
+    // knowing the full cache key. Called automatically by referral-flows-compute.
+    // This is handled internally — not a public route.
+
     return jsonResponse(404, { error: 'Unknown action: ' + action });
 
   } catch(topErr) {
