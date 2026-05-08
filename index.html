@@ -764,7 +764,7 @@ let cmsLookupAvailable = null; // null=unknown, true=yes, false=no
 async function checkCMSLookup() {
   if (cmsLookupAvailable !== null) return cmsLookupAvailable;
   try {
-    const res = await fetch('https://eclectic-kitten-27fdf8.netlify.app/.netlify/functions/router?action=cms-lookup', {
+    const res = await fetch('https://mapping-tool-cc.netlify.app/.netlify/functions/router?action=cms-lookup', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: '[]'
@@ -806,7 +806,7 @@ async function enrichWithCMS(facilities) {
   if (!batch.length) return facilities;
 
   try {
-    const res = await fetch('https://eclectic-kitten-27fdf8.netlify.app/.netlify/functions/router?action=cms-lookup', {
+    const res = await fetch('https://mapping-tool-cc.netlify.app/.netlify/functions/router?action=cms-lookup', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(batch)
@@ -838,7 +838,7 @@ async function loadIconForSystem(systemName) {
   if (!systemName) return;
   try {
     var key = encodeURIComponent(systemName.toLowerCase().trim());
-    var res = await fetch('https://eclectic-kitten-27fdf8.netlify.app/.netlify/functions/router?action=icon-load&system=' + key);
+    var res = await fetch('https://mapping-tool-cc.netlify.app/.netlify/functions/router?action=icon-load&system=' + key);
     if (!res.ok) return;
     var data = await res.json();
     if (!data.dataUrl) {
@@ -868,7 +868,7 @@ async function saveSharedIcon(dataUrl) {
   }
   try {
     var key = encodeURIComponent(systemName.toLowerCase().trim());
-    var res = await fetch('https://eclectic-kitten-27fdf8.netlify.app/.netlify/functions/router?action=icon-save&system=' + key, {
+    var res = await fetch('https://mapping-tool-cc.netlify.app/.netlify/functions/router?action=icon-save&system=' + key, {
       method: 'POST',
       headers: { 'Content-Type': 'text/plain' },
       body: dataUrl
@@ -886,7 +886,7 @@ function loadSharedIcon() { /* icons now load per system in runSearch */ }
 
 async function loadSharedLogo() {
   try {
-    var res = await fetch('https://eclectic-kitten-27fdf8.netlify.app/.netlify/functions/router?action=logo-load');
+    var res = await fetch('https://mapping-tool-cc.netlify.app/.netlify/functions/router?action=logo-load');
     if (!res.ok) return;
     var data = await res.json();
     if (!data.dataUrl) return;
@@ -905,7 +905,7 @@ async function loadSharedLogo() {
 async function saveSharedLogo(dataUrl) {
   try {
     // Send the raw data URL as text — router will decode it server-side
-    var res = await fetch('https://eclectic-kitten-27fdf8.netlify.app/.netlify/functions/router?action=logo-save', {
+    var res = await fetch('https://mapping-tool-cc.netlify.app/.netlify/functions/router?action=logo-save', {
       method: 'POST',
       headers: { 'Content-Type': 'text/plain' },
       body: dataUrl
@@ -931,7 +931,7 @@ const searchBox = document.getElementById('iconLibSearch');
   if (status) status.textContent = '';
 
   try {
-    const res = await fetch('https://eclectic-kitten-27fdf8.netlify.app/.netlify/functions/router?action=icon-list');
+    const res = await fetch('https://mapping-tool-cc.netlify.app/.netlify/functions/router?action=icon-list');
     if (!res.ok) throw new Error('HTTP ' + res.status);
     const data = await res.json();
     const icons = data.icons || [];
@@ -972,7 +972,7 @@ return '<div class="icon-lib-card" id="icon-card-' + ic.system + '">'
     // Lazy-load image data for each card
     icons.forEach(async function(ic) {
       try {
-        const r = await fetch('https://eclectic-kitten-27fdf8.netlify.app/.netlify/functions/router?action=icon-load&system=' + encodeURIComponent(ic.system));
+        const r = await fetch('https://mapping-tool-cc.netlify.app/.netlify/functions/router?action=icon-load&system=' + encodeURIComponent(ic.system));
         if (!r.ok) return;
         const d = await r.json();
         if (!d.dataUrl) return;
@@ -1014,7 +1014,7 @@ async function deleteLibraryIcon(system) {
   const status = document.getElementById('iconLibStatus');
   if (status) status.textContent = 'Deleting…';
   try {
-    await fetch('https://eclectic-kitten-27fdf8.netlify.app/.netlify/functions/router?action=icon-clear&system=' + encodeURIComponent(system), { method: 'POST' });
+    await fetch('https://mapping-tool-cc.netlify.app/.netlify/functions/router?action=icon-clear&system=' + encodeURIComponent(system), { method: 'POST' });
     const card = document.getElementById('icon-card-' + system);
     if (card) card.remove();
     if (status) status.textContent = 'Deleted.';
@@ -1047,7 +1047,7 @@ async function uploadLibraryIcon(event) {
   const reader = new FileReader();
   reader.onload = async function(ev) {
     try {
-      const res = await fetch('https://eclectic-kitten-27fdf8.netlify.app/.netlify/functions/router?action=icon-save&system=' + systemKey, {
+      const res = await fetch('https://mapping-tool-cc.netlify.app/.netlify/functions/router?action=icon-save&system=' + systemKey, {
         method: 'POST',
         headers: { 'Content-Type': 'text/plain' },
         body: ev.target.result
@@ -1178,7 +1178,7 @@ function clearLogo() {
   prev.src = '';
   prev.style.display = 'none';
   // Clear from shared storage
-  fetch('https://eclectic-kitten-27fdf8.netlify.app/.netlify/functions/router?action=logo-clear', { method: 'POST' })
+  fetch('https://mapping-tool-cc.netlify.app/.netlify/functions/router?action=logo-clear', { method: 'POST' })
     .catch(function(e) { console.warn('Logo clear failed: ' + e.message); });
 }
 
@@ -1193,7 +1193,7 @@ function clearIcon(which) {
       ? document.getElementById('targetInput').value.trim()
       : '';
     var key = encodeURIComponent(systemName.toLowerCase().trim());
-    fetch('https://eclectic-kitten-27fdf8.netlify.app/.netlify/functions/router?action=icon-clear&system=' + key, { method: 'POST' })
+    fetch('https://mapping-tool-cc.netlify.app/.netlify/functions/router?action=icon-clear&system=' + key, { method: 'POST' })
       .catch(function(e) { console.warn('Icon clear failed: ' + e.message); });
   }
 }
@@ -1289,7 +1289,7 @@ function makeLeafletIcon(dataUrl, size) {
 // Write: on every live Nominatim hit, write-back to both layers asynchronously.
 // Keys are namespaced: zip:XXXXX | reverse:LAT:LON | addr:QUERY_STRING
 
-const API = 'https://eclectic-kitten-27fdf8.netlify.app/.netlify/functions/router';
+const API = 'https://mapping-tool-cc.netlify.app/.netlify/functions/router';
 // ── Search result cache ───────────────────────────────────────────────────────
 function buildSearchCacheKey(zip, radiusMeters, types) {
   return zip + '|' + radiusMeters + '|' + [...types].sort().join(',');
@@ -1537,7 +1537,7 @@ function haversineMeters(lat1, lon1, lat2, lon2) {
 async function queryNPI(taxonomyCode, state, enumerationType, limit) {
   enumerationType = enumerationType || 'NPI-2';
   limit = limit || 200;
-  var url = 'https://eclectic-kitten-27fdf8.netlify.app/.netlify/functions/router?action=npi-proxy&version=2.1'
+  var url = 'https://mapping-tool-cc.netlify.app/.netlify/functions/router?action=npi-proxy&version=2.1'
     + '&taxonomy_description=' + encodeURIComponent(taxonomyCode)
     + '&state=' + encodeURIComponent(state)
     + '&limit=' + limit
@@ -2913,7 +2913,7 @@ function scheduleSaveSharedState() {
 
 async function loadSharedState() {
   try {
-    var res = await fetch('https://eclectic-kitten-27fdf8.netlify.app/.netlify/functions/router?action=state-load');
+    var res = await fetch('https://mapping-tool-cc.netlify.app/.netlify/functions/router?action=state-load');
     if (!res.ok) { console.warn('State load HTTP ' + res.status); return; }
     var state = await res.json();
     if (state.overrides)     systemOverrides    = state.overrides;
@@ -2937,7 +2937,7 @@ async function saveSharedState() {
       customSystems: customSystemNames,
       excluded:      [...excluded]
     };
-    var res = await fetch('https://eclectic-kitten-27fdf8.netlify.app/.netlify/functions/router?action=state-save', {
+    var res = await fetch('https://mapping-tool-cc.netlify.app/.netlify/functions/router?action=state-save', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(state)
