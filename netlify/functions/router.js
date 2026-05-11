@@ -371,6 +371,253 @@ var KNOWN_SYSTEMS = [
   { name: 'Universal Health',       patterns: ['universal health','uhs '] },
 ];
 
+// Build search tokens from a typed name — splits on spaces, dashes, common words
+function tokenize(str) {
+  // Only strip pure connector words — keep substantive words like 'health',
+  // 'methodist', 'memorial' etc. that distinguish one system from another.
+  var stopwords = new Set(['the','and','for','of','at','in','by','to','a','an']);
+  return str.toLowerCase()
+    .replace(/[^a-z0-9 ]/g, ' ')
+    .split(/\s+/)
+    .filter(function(w){ return w.length > 1 && !stopwords.has(w); });
+}
+
+// Score how well a facility name matches the typed target (0 = no match)
+function matchScore(facilityName, targetTokens) {
+  if (!facilityName) return 0;
+  const fn = facilityName.toLowerCase();
+  let score = 0;
+  targetTokens.forEach(function(tok) {
+    if (fn.includes(tok)) score++;
+  });
+  return score;
+}
+
+function groupBySystem(facilities, targetInput) {
+  const systems = {};
+  const targetTokens = tokenize(targetInput);
+  const targetLower  = targetInput.toLowerCase();
+  // Pre-compute target domain if user typed a known system name
+  var targetDomain = null;
+  if (typeof DOMAIN_SYSTEM_MAP !== 'undefined') {
+    Object.entries(DOMAIN_SYSTEM_MAP).forEach(function(entry) {
+      if (entry[1].toLowerCase() === targetLower ||
+          entry[1].toLowerCase().includes(targetLower) ||
+          targetLower.includes(entry[1].toLowerCase().split(' ')[0])) {
+        targetDomain = entry[0];
+      }
+    });
+  }
+
+  facilities.forEach(function(h) {
+    var rawName = h.tags && h.tags.name ? h.tags.name : 'Unknown';
+    var npiOrg  = h.tags && h.tags.npi_org ? h.tags.npi_org : '';
+    const name    = (npiOrg.length > rawName.length) ? npiOrg : rawName;
+    const nameLow = name.toLowerCase();
+    let bucket    = null;
+
+    // ── Step -1: Check saved overrides by stable key (highest priority) ──────
+    var stableKey = overrideKey(h);
+    if (systemOverrides[stableKey]) {
+      bucket = systemOverrides[stableKey];
+    }
+
+    // ── Step 0: Use authoritative domain attribution from embedded data ──────
+    // This is the most reliable signal — the endpoint domain identifies
+    // exactly which EHR instance (= health system) the facility belongs to.
+    var facDomain = h.dom || (h.tags && h.tags.dom) || '';
+    var facSys    = h._embeddedSystem || (h.tags && h.tags._embeddedSystem) || '';
+
+    if (!bucket && facDomain && typeof DOMAIN_SYSTEM_MAP !== 'undefined') {
+      var mappedSys = DOMAIN_SYSTEM_MAP[facDomain];
+      if (mappedSys) {
+        // Check if this domain matches the target
+        if (facDomain === targetDomain ||
+            (targetTokens.length > 0 && matchScore(mappedSys, targetTokens) === targetTokens.length)) {
+          bucket = targetInput;
+        } else {
+          bucket = mappedSys;
+        }
+      }
+    }
+
+    // Use pre-assigned system from embedded data if available
+    if (!bucket && facSys) {
+      if (targetTokens.length > 0 && matchScore(facSys, targetTokens) === targetTokens.length) {
+        bucket = targetInput;
+      } else {
+        bucket = facSys;
+      }
+    }
+
+    // ── Step 1: Match against the typed target by name (fallback for OSM/NPI)
+    if (!bucket && targetTokens.length > 0 &&
+        matchScore(name, targetTokens) === targetTokens.length) {
+      bucket = targetInput;
+    }
+
+    // ── Step 2: Match against known parent health system names
+    if (!bucket) {
+      for (var i = 0; i < KNOWN_SYSTEMS.length; i++) {
+        var sys = KNOWN_SYSTEMS[i];
+        // Skip if this system matches the typed target (avoid double-claiming)
+        if (sys.name.toLowerCase() === targetLower ||
+            targetTokens.some(function(t){ return sys.name.toLowerCase().includes(t); })) continue;
+        for (var j = 0; j < sys.patterns.length; j++) {
+          var pat = sys.patterns[j];
+          // Use word-boundary check: pattern must appear as a whole phrase,
+          // not as a fragment inside another word
+          var patRx = new RegExp('(?:^|[\\s\\-,\\/])' + pat.replace(/[.*+?^${}()|[\]\\]/g,'\\$&') + '(?:[\\s\\-,\\/]|$)');
+          if (patRx.test(nameLow)) {
+            bucket = sys.name;
+            break;
+          }
+        }
+        if (bucket) break;
+      }
+    }
+
+    // ── Step 3: Anything unrecognized → "Independent / Community"
+    // No keyword-fragment bucketing — keeps the legend and insights clean.
+    if (!bucket) {
+      bucket = 'Independent / Community';
+    }
+
+    if (!systems[bucket]) systems[bucket] = [];
+    systems[bucket].push(h);
+  });
+
+  // ── Step 4: Dynamic auto-grouping ─────────────────────────────────────────
+  // Look at facilities still in "Independent / Community" and group any that
+  // share an uncommon prefix (3+ facilities with the same meaningful name start).
+  var indFacs = systems['Independent / Community'] || [];
+  if (indFacs.length > 0) {
+    var autoGroups = autoGroupByName(indFacs);
+    Object.keys(autoGroups).forEach(function(groupName) {
+      var grouped = autoGroups[groupName];
+      if (grouped.length >= 3) {
+        // Move these out of Independent into their own bucket
+        systems['Independent / Community'] = (systems['Independent / Community'] || [])
+          .filter(function(f) { return !grouped.some(function(g) { return g.id === f.id; }); });
+        if (!systems[groupName]) systems[groupName] = [];
+        systems[groupName] = systems[groupName].concat(grouped);
+      }
+    });
+    // Clean up empty Independent bucket
+    if (systems['Independent / Community'] && systems['Independent / Community'].length === 0) {
+      delete systems['Independent / Community'];
+    }
+  }
+
+  return systems;
+}
+
+// ── Auto-grouping by shared name prefix ───────────────────────────────────────
+// Common generic words that should NOT trigger auto-grouping on their own
+const AUTO_GROUP_STOPWORDS = new Set([
+  // Articles / prepositions
+  'the','and','of','at','in','for','a','an','by','to','with',
+  // Generic healthcare words
+  'medical','health','care','center','centre','clinic','hospital',
+  'medicine','group','associates','services','system','network',
+  'practice','practices','physicians','physician','doctors','doctor',
+  'regional','community','general','national','university','institute',
+  'wellness','healthcare','specialty','specialist','specialists',
+  'ambulatory','surgical','surgery','outpatient','inpatient',
+  // Directional / generic location words
+  'new','old','north','south','east','west','central','upper','lower',
+  'greater','metro','metropolitan','suburban','downtown','midtown',
+  // Religious / system branding words
+  'saint','st','mt','mount','holy','sacred','mercy','providence',
+  'memorial','foundation','partners','alliance','integrated',
+  // State abbreviations that appear in names
+  'ma','ct','ri','nh','vt','me','ny','nj','pa',
+  // Common city names that appear as prefixes
+  'boston','cambridge','worcester','springfield','lowell','newton',
+  'quincy','brockton','lynn','somerville','fall','new','framingham',
+  // Words that trail off into location (causing truncation)
+  'faculty','harvard','for','by','at','with','via'
+]);
+
+function autoGroupByName(facilities) {
+  var groups = {};
+
+  facilities.forEach(function(f) {
+    var name = (f.tags && f.tags.name) ? f.tags.name : '';
+    if (!name) return;
+
+    var words = name.toLowerCase()
+      .replace(/[^a-z0-9\s]/g, ' ')
+      .split(/\s+/)
+      .filter(function(w) { return w.length > 1; });
+
+    // Try prefix lengths from 3 words down to 2
+    for (var len = Math.min(4, words.length); len >= 2; len--) {
+      var prefix = words.slice(0, len);
+
+      // Skip if ALL words are stopwords
+      var meaningfulWords = prefix.filter(function(w) { return !AUTO_GROUP_STOPWORDS.has(w); });
+      if (meaningfulWords.length === 0) continue;
+
+      // Skip if the FIRST word is a stopword — too generic
+      if (AUTO_GROUP_STOPWORDS.has(prefix[0])) continue;
+
+      // Need at least one truly distinctive word (not a stopword) in first 2 words
+      var firstTwoMeaningful = prefix.slice(0, 2).filter(function(w) { return !AUTO_GROUP_STOPWORDS.has(w); });
+      if (firstTwoMeaningful.length === 0) continue;
+
+      // If first word is meaningful and short (likely acronym), allow full prefix even with stopwords
+      var firstWord = prefix[0];
+      var isAcronym = firstWord.length <= 5 && /^[a-z]+$/.test(firstWord);
+      // For acronym-led names, use just the first 3 words as the key (e.g. "afc urgent care")
+      if (isAcronym && len > 3) continue; // don't use 4-word prefixes for acronyms
+
+      var key = prefix.join(' ');
+
+      // Capitalize properly for display
+      // Rebuild display name from ORIGINAL facility name words, not lowercased
+      var origWords = name.split(/\s+/);
+      var displayName = prefix.map(function(w, wi) {
+        // Find the original casing for this word position
+        var orig = origWords[wi] || w;
+        // If original is all-caps and short (acronym like AFC, ER), preserve it
+        if (orig.length <= 4 && orig === orig.toUpperCase() && /^[A-Z]+$/.test(orig)) return orig;
+        return AUTO_GROUP_STOPWORDS.has(w) ? w : (orig.charAt(0).toUpperCase() + orig.slice(1).toLowerCase());
+      }).join(' ');
+
+      if (!groups[displayName]) groups[displayName] = [];
+
+      // Only add if not already in a longer prefix group
+      var alreadyGrouped = Object.keys(groups).some(function(g) {
+        return g !== displayName && g.toLowerCase().startsWith(key) &&
+               groups[g].some(function(gf) { return gf.id === f.id; });
+      });
+
+      if (!alreadyGrouped) {
+        groups[displayName].push(f);
+        break; // Use the longest matching prefix
+      }
+    }
+  });
+
+  // Remove groups where facilities actually belong to a longer/more specific group
+  // Keep only the most specific match per facility
+  var finalGroups = {};
+  var assigned = new Set();
+
+  // Sort by prefix length descending — longer prefix = more specific
+  Object.keys(groups).sort(function(a, b) { return b.length - a.length; }).forEach(function(gName) {
+    var unassigned = groups[gName].filter(function(f) { return !assigned.has(f.id); });
+    if (unassigned.length >= 3) {
+      finalGroups[gName] = unassigned;
+      unassigned.forEach(function(f) { assigned.add(f.id); });
+    }
+  });
+
+  return finalGroups;
+}
+
+
 // ── Icon index helpers ────────────────────────────────────────────────────────
 async function readIconIndex(sasToken) {
   try {
@@ -1179,6 +1426,113 @@ if (action === 'competitors-near') {
     // knowing the full cache key. Called automatically by referral-flows-compute.
     // This is handled internally — not a public route.
 
+// ── competitors-near ─────────────────────────────────────────────────────
+    if (action === 'competitors-near') {
+      const lat    = parseFloat(params.lat   || '0');
+      const lon    = parseFloat(params.lon   || '0');
+      const miles  = parseFloat(params.miles || '25');
+      const target = (params.target || '').trim();
+      if (!lat || !lon) return jsonResponse(400, { error: 'lat and lon required' });
+      const radiusM = miles * 1609.34;
+      const targetLower = target.toLowerCase();
+
+      function tokenizeR(str) {
+        var stop = new Set(['the','and','for','of','at','in','by','to','a','an']);
+        return str.toLowerCase().replace(/[^a-z0-9 ]/g,' ').split(/\s+/)
+          .filter(function(w){ return w.length > 1 && !stop.has(w); });
+      }
+
+      try {
+        if (!qhinCache || (Date.now() - qhinCacheTime) >= CACHE_TTL) {
+          const raw = await fetchText(getBlobUrl(sasToken, 'qhin-data', 'facilities.json'));
+          qhinCache     = JSON.parse(raw);
+          qhinCacheTime = Date.now();
+        }
+        const facilities = Array.isArray(qhinCache) ? qhinCache : (qhinCache.facilities || []);
+
+        let overrides = {};
+        try {
+          const stateRaw = await fetchText(getBlobUrl(sasToken, 'app-state', 'shared-state.json'));
+          overrides = JSON.parse(stateRaw).overrides || {};
+        } catch(e) {}
+
+        function distM(lat1, lon1, lat2, lon2) {
+          const R = 6371000, dLat=(lat2-lat1)*Math.PI/180, dLon=(lon2-lon1)*Math.PI/180;
+          const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)**2;
+          return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+        }
+
+        const targetTokens = tokenizeR(target);
+
+        function matchByPatterns(nameLow) {
+          for (var i = 0; i < KNOWN_SYSTEMS.length; i++) {
+            var sys = KNOWN_SYSTEMS[i];
+            var sysLow = sys.name.toLowerCase();
+            // Skip systems that match the target
+            if (sysLow === targetLower || targetTokens.some(function(t){ return sysLow.includes(t); })) continue;
+            for (var j = 0; j < sys.patterns.length; j++) {
+              var pat = sys.patterns[j];
+              var rx = new RegExp('(?:^|[\\s\\-,\\/])' + pat.replace(/[.*+?^${}()|[\]\\]/g,'\\$&') + '(?:[\\s\\-,\\/]|$)');
+              if (rx.test(nameLow) || nameLow.startsWith(pat)) return sys.name;
+            }
+          }
+          return null;
+        }
+
+        const counts = {};
+        let targetCount = 0;
+
+        facilities.forEach(function(f) {
+          const fLat = parseFloat(f.lat || (f.center && f.center.lat) || 0);
+          const fLon = parseFloat(f.lon || (f.center && f.center.lon) || 0);
+          if (!fLat || !fLon) return;
+          if (distM(lat, lon, fLat, fLon) > radiusM) return;
+
+          const rawName = (f.tags && f.tags.name) || f.name || '';
+          const npiOrg  = (f.tags && f.tags.npi_org) || '';
+          const name    = npiOrg.length > rawName.length ? npiOrg : rawName;
+          const nameLow = name.toLowerCase();
+
+          // Check override first (key format: "name|lat|lon")
+          const oKey = name.toLowerCase() + '|' + fLat.toFixed(3) + '|' + fLon.toFixed(3);
+          let bucket = overrides[oKey] || null;
+
+          // Pattern matching against KNOWN_SYSTEMS
+          if (!bucket) bucket = matchByPatterns(nameLow);
+
+          // Target name matching
+          if (!bucket && targetTokens.length > 0) {
+            var score = 0;
+            targetTokens.forEach(function(t){ if (nameLow.includes(t)) score++; });
+            if (score === targetTokens.length) bucket = target;
+          }
+
+          if (!bucket) bucket = 'Independent / Community';
+          if (bucket === 'Independent / Community') return;
+
+          const bucketLow = bucket.toLowerCase();
+          const isTarget = bucketLow === targetLower ||
+                           bucketLow.includes(targetLower) ||
+                           targetLower.includes(bucketLow.split(' ')[0]);
+          if (isTarget) targetCount++;
+          else counts[bucket] = (counts[bucket] || 0) + 1;
+        });
+
+        const total = targetCount + Object.values(counts).reduce((a,b)=>a+b,0);
+        const competitors = Object.entries(counts)
+          .sort((a,b) => b[1]-a[1])
+          .slice(0, 16)
+          .map(([name, count]) => ({
+            name, count,
+            share: total > 0 ? Math.round(count/total*100) : 0
+          }));
+
+        return jsonResponse(200, { competitors, targetCount, total, center:{lat,lon}, miles });
+      } catch(err) {
+        return jsonResponse(502, { error: 'competitors-near failed', detail: err.message });
+      }
+    }
+    
     return jsonResponse(404, { error: 'Unknown action: ' + action });
 
   } catch(topErr) {
