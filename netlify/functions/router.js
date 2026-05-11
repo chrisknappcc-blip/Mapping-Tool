@@ -627,14 +627,20 @@ exports.handler = async function(event, context) {
         const targetTokens = tokenizeR(target);
 
         function matchByPatterns(nameLow) {
+          var nameWords = nameLow.trim().split(/\s+/).length;
           for (var i = 0; i < KNOWN_SYSTEMS.length; i++) {
             var sys = KNOWN_SYSTEMS[i];
             var sysLow = sys.name.toLowerCase();
             if (sysLow === targetLower || targetTokens.some(function(t){ return sysLow.includes(t); })) continue;
             for (var j = 0; j < sys.patterns.length; j++) {
               var pat = sys.patterns[j];
-              var rx = new RegExp('(?:^|[\\s\\-,\\/])' + pat.replace(/[.*+?^${}()|[\]\\]/g,'\\$&') + '(?:[\\s\\-,\\/]|$)');
-              if (rx.test(nameLow) || nameLow.startsWith(pat)) return sys.name;
+              var patWords = pat.trim().split(/\s+/).length;
+              var rx = new RegExp('(?:^|[\\s\\-,\/])' + pat.replace(/[.*+?^${}()|[\\]\\]/g,'\\$&') + '(?:[\\s\\-,\/]|$)');
+              if (rx.test(nameLow)) {
+                // Single-word patterns are too generic — only match short facility names
+                if (patWords === 1 && nameWords > 3) continue;
+                return sys.name;
+              }
             }
           }
           return null;
