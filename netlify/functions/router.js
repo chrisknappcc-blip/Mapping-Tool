@@ -453,6 +453,99 @@ exports.handler = async function(event, context) {
       }
     }
 
+// ── competitors-near ─────────────────────────────────────────────────────────
+if (action === 'competitors-near') {
+  const lat    = parseFloat(params.lat   || '0');
+  const lon    = parseFloat(params.lon   || '0');
+  const miles  = parseFloat(params.miles || '25');
+  const target = (params.target || '').toLowerCase().trim();
+  if (!lat || !lon) return jsonResponse(400, { error: 'lat and lon required' });
+  const radiusM = miles * 1609.34;
+
+  try {
+    // Load state and QHIN in parallel
+    if (!qhinCache || (Date.now() - qhinCacheTime) >= CACHE_TTL) {
+      const raw = await fetchText(getBlobUrl(sasToken, 'qhin-data', 'facilities.json'));
+      qhinCache     = JSON.parse(raw);
+      qhinCacheTime = Date.now();
+    }
+    const facilities = Array.isArray(qhinCache) ? qhinCache : (qhinCache.facilities || []);
+
+    let overrides = {};
+    try {
+      const stateRaw = await fetchText(getBlobUrl(sasToken, 'app-state', 'shared-state.json'));
+      overrides = JSON.parse(stateRaw).overrides || {};
+    } catch(e) { /* no overrides */ }
+
+    function distM(lat1, lon1, lat2, lon2) {
+      const R = 6371000, dLat = (lat2-lat1)*Math.PI/180, dLon = (lon2-lon1)*Math.PI/180;
+      const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)**2;
+      return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    }
+
+    // Build override lookup by stable key (name|lat|lon format)
+    const overrideLookup = {};
+    Object.entries(overrides).forEach(function([key, sysName]) {
+      const parts = key.split('|');
+      if (parts.length === 3) {
+        overrideLookup[key] = sysName;
+      }
+    });
+
+    const counts = {};
+    let targetCount = 0;
+
+    facilities.forEach(function(f) {
+      const fLat = parseFloat(f.lat || (f.center && f.center.lat) || 0);
+      const fLon = parseFloat(f.lon || (f.center && f.center.lon) || 0);
+      if (!fLat || !fLon) return;
+      if (distM(lat, lon, fLat, fLon) > radiusM) return;
+
+      // Check overrides first
+      const name = (f.tags && f.tags.name) || f.name || '';
+      const nameLow = name.toLowerCase();
+      const stableKey = name.toLowerCase().replace(/\s+/g,'_') + '|' + fLat.toFixed(3) + '|' + fLon.toFixed(3);
+      
+      let bucket = overrides[stableKey] || null;
+
+      // Name-based target match
+      if (!bucket && target && nameLow.includes(target.split(' ')[0])) {
+        bucket = params.target;
+      }
+
+      if (!bucket) bucket = 'Independent / Community';
+      if (bucket === 'Independent / Community') return;
+
+      const bucketLow = bucket.toLowerCase();
+      if (target && (bucketLow === target || bucketLow.includes(target) || target.includes(bucketLow.split(' ')[0]))) {
+        targetCount++;
+      } else {
+        counts[bucket] = (counts[bucket] || 0) + 1;
+      }
+    });
+
+    const total = targetCount + Object.values(counts).reduce((a, b) => a + b, 0);
+    const competitors = Object.entries(counts)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 16)
+      .map(([name, count]) => ({
+        name,
+        count,
+        share: total > 0 ? Math.round(count / total * 100) : 0
+      }));
+
+    return jsonResponse(200, {
+      competitors,
+      targetCount,
+      total,
+      center: { lat, lon },
+      miles
+    });
+  } catch(err) {
+    return jsonResponse(502, { error: 'competitors-near failed', detail: err.message });
+  }
+}
+    
     // ── state-save ───────────────────────────────────────────────────────────
     if (action === 'state-save') {
       if (!sasToken) return jsonResponse(500, { error: 'SAS token not configured' });
