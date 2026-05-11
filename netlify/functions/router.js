@@ -116,11 +116,10 @@ function parseCSVLine(line) {
 }
 
 var KNOWN_SYSTEMS = [
-  // ── New England (expanded affiliate lists) ───────────────────────────────
   { name: 'Mass General Brigham', patterns: [
     'mass general','massachusetts general',
     'brigham and women','brigham & women','brigham hospital',
-    'mgh ','mgh-','faulkner hospital','faulkner hospital',
+    'mgh ','mgh-','faulkner hospital',
     'cooley dickinson','newton-wellesley','newton wellesley',
     'north shore medical','salem hospital','union hospital','union campus',
     'wentworth-douglass','wentworth douglass',
@@ -201,7 +200,7 @@ var KNOWN_SYSTEMS = [
   { name: 'Hartford HealthCare', patterns: [
     'hartford hospital','hartford healthcare','hartford health',
     'backus hospital','backus',
-    'charlotte hungerford','charlotte hungerford',
+    'charlotte hungerford',
     'midstate medical','midstate',
     'natchaug hospital','natchaug',
     'windham hospital','windham',
@@ -242,11 +241,10 @@ var KNOWN_SYSTEMS = [
     'new london hospital','new london nh',
     'cottage hospital nh'
   ]},
-  // ── National systems ─────────────────────────────────────────────────────
   { name: 'HCA Healthcare',         patterns: ['hca healthcare','hca hospital','columbia/hca','hca affiliated'] },
   { name: 'Trinity Health',         patterns: ['trinity health','mercy health','saint joseph mercy','mercy medical center','mount mercy','saint mary mercy'] },
   { name: 'Ascension',              patterns: ['ascension','providence health ministries','columbia st. mary','wheaton franciscan'] },
-  { name: 'CommonSpirit Health',    patterns: ['commonspirit','common spirit','dignity health','chichme','franciscan health','dominican hospital'] },
+  { name: 'CommonSpirit Health',    patterns: ['commonspirit','common spirit','dignity health','franciscan health','dominican hospital'] },
   { name: 'Advocate Aurora',        patterns: ['advocate aurora','advocate health','aurora health','advocate christ','advocate good samaritan','advocate illinois masonic'] },
   { name: 'Providence',             patterns: ['providence health','providence st','providence regional','providence portland'] },
   { name: 'Northwell Health',       patterns: ['northwell','lenox hill','long island jewish','north shore university hospital','south shore hospital ny','plainview hospital','syosset hospital','huntington hospital ny','phelps hospital','glen cove hospital'] },
@@ -279,7 +277,7 @@ var KNOWN_SYSTEMS = [
   { name: 'Allina Health',          patterns: ['allina health','abbott northwestern','united hospital mn','mercy hospital mn','river falls medical'] },
   { name: 'HealthPartners',         patterns: ['healthpartners','health partners','regions hospital','methodist hospital mn','lakeview hospital mn'] },
   { name: 'UCHealth',               patterns: ['uchealth','uc health','university of colorado hospital','memorial hospital colorado','poudre valley'] },
-  { name: 'Centura Health',         patterns: ['centura','porter adventist','st. francis hospital co','penrose hospital','parker adventist','avista adventist'] },
+  { name: 'Centura Health',         patterns: ['centura','porter adventist','st. francis hospital co','penrose hospital','avista adventist'] },
   { name: 'Scripps Health',         patterns: ['scripps health','scripps memorial','scripps green','scripps mercy','scripps encinitas'] },
   { name: 'Sharp HealthCare',       patterns: ['sharp healthcare','sharp memorial','sharp grossmont','sharp chula vista','sharp coronado'] },
   { name: 'Cedars-Sinai',           patterns: ['cedars-sinai','cedars sinai','marina del rey hospital cs'] },
@@ -296,7 +294,7 @@ var KNOWN_SYSTEMS = [
   { name: 'Baylor Scott & White',   patterns: ['baylor scott','baylor white','baylor university medical','scott & white','scott and white'] },
   { name: 'Texas Health Resources', patterns: ['texas health resources','texas health harris','texas health presbyterian'] },
   { name: 'Memorial Hermann',       patterns: ['memorial hermann','memorial herman','memorial city medical'] },
-  { name: 'Houston Methodist',      patterns: ['houston methodist','methodist hospital houston','houston methodist sugar land'] },
+  { name: 'Houston Methodist',      patterns: ['houston methodist','methodist hospital houston','houston methodist sugar land','houston methodist west','houston methodist willowbrook','houston methodist baytown','houston methodist clear lake','houston methodist the woodlands','houston methodist san jacinto'] },
   { name: 'MD Anderson',            patterns: ['md anderson','anderson cancer','university of texas md anderson'] },
   { name: 'Baptist Health',         patterns: ['baptist health','baptist hospital','baptist medical center'] },
   { name: 'Encompass Health',       patterns: ['encompass health','encompass rehabilitation','healthsouth'] },
@@ -304,347 +302,11 @@ var KNOWN_SYSTEMS = [
   { name: 'Community Health Systems', patterns: ['community health systems','chs hospital','chs medical center'] },
   { name: 'Tenet Healthcare',       patterns: ['tenet','detroit medical center','hahnemann university hospital','palm beach gardens medical'] },
   { name: 'Universal Health',       patterns: ['universal health services','uhs hospital','universal health','behavioral health uhs'] },
-  { name: 'Ascension',              patterns: ['ascension'] },
-  { name: 'CommonSpirit Health',    patterns: ['commonspirit','common spirit','dignity health','chichme'] },
-  { name: 'Advocate Aurora',        patterns: ['advocate aurora','advocate health','aurora health'] },
-  { name: 'Providence',             patterns: ['providence health','providence st'] },
-  { name: 'Northwell Health',       patterns: ['northwell'] },
-  { name: 'NYU Langone',            patterns: ['nyu langone','nyu hospital'] },
-  { name: 'NewYork-Presbyterian',   patterns: ['newyork-presbyterian','new york presbyterian','nyp '] },
-  { name: 'Mount Sinai',            patterns: ['mount sinai','icahn'] },
-  { name: 'Memorial Sloan Kettering', patterns: ['memorial sloan','msk ','sloan kettering'] },
-  { name: 'Cleveland Clinic',       patterns: ['cleveland clinic'] },
-  { name: 'Mayo Clinic',            patterns: ['mayo clinic'] },
-  { name: 'Kaiser Permanente',      patterns: ['kaiser'] },
-  { name: 'Sutter Health',          patterns: ['sutter'] },
-  { name: 'Intermountain Health',   patterns: ['intermountain'] },
-  { name: 'Banner Health',          patterns: ['banner health','banner hospital'] },
-  { name: 'AdventHealth',           patterns: ['adventhealth','advent health','florida hospital'] },
-  { name: 'Atrium Health',          patterns: ['atrium health','carolinas medical'] },
-  { name: 'Prisma Health',          patterns: ['prisma'] },
-  { name: 'OhioHealth',             patterns: ['ohiohealth','ohio health'] },
-  { name: 'University Hospitals',   patterns: ['university hospitals'] },
-  { name: 'Penn Medicine',          patterns: ['penn medicine','university of pennsylvania health'] },
-  { name: 'Jefferson Health',       patterns: ['jefferson health','thomas jefferson'] },
-  { name: 'MaineHealth',            patterns: ['mainehealth','maine health','maine medical'] },
-  { name: 'Dartmouth Health',       patterns: ['dartmouth','mary hitchcock'] },
-  { name: 'ChristianaCare',         patterns: ['christianacare','christiana care'] },
-  { name: 'Spectrum Health',        patterns: ['spectrum health','corewell'] },
-  { name: 'Henry Ford Health',      patterns: ['henry ford'] },
-  { name: 'Beaumont Health',        patterns: ['beaumont'] },
-  { name: 'OSF HealthCare',         patterns: ['osf healthcare','osf health'] },
-  { name: 'SSM Health',             patterns: ['ssm health'] },
-  { name: 'BJC HealthCare',         patterns: ['bjc'] },
-  { name: 'Barnes-Jewish',          patterns: ['barnes-jewish','barnes jewish'] },
-  { name: 'Sanford Health',         patterns: ['sanford health'] },
-  { name: 'Fairview Health',        patterns: ['fairview'] },
-  { name: 'Allina Health',          patterns: ['allina'] },
-  { name: 'HealthPartners',         patterns: ['healthpartners','health partners'] },
-  { name: 'UCHealth',               patterns: ['uchealth','uc health'] },
-  { name: 'SCL Health',             patterns: ['scl health'] },
-  { name: 'Centura Health',         patterns: ['centura'] },
-  { name: 'Scripps Health',         patterns: ['scripps'] },
-  { name: 'Sharp HealthCare',       patterns: ['sharp healthcare','sharp hospital'] },
-  { name: 'Dignity Health',         patterns: ['dignity health'] },
-  { name: 'Cedars-Sinai',           patterns: ['cedars-sinai','cedars sinai'] },
-  { name: 'UCLA Health',            patterns: ['ucla health','ronald reagan ucla'] },
-  { name: 'UCSF Health',            patterns: ['ucsf'] },
-  { name: 'Stanford Health',        patterns: ['stanford health','stanford hospital'] },
-  { name: 'Vanderbilt Health',      patterns: ['vanderbilt'] },
-  { name: 'Emory Healthcare',       patterns: ['emory'] },
-  { name: 'Piedmont Healthcare',    patterns: ['piedmont healthcare'] },
-  { name: 'WellStar Health',        patterns: ['wellstar'] },
-  { name: 'Ochsner Health',         patterns: ['ochsner'] },
-  { name: 'LCMC Health',            patterns: ['lcmc'] },
-  { name: 'CHRISTUS Health',        patterns: ['christus'] },
-  { name: 'Baylor Scott & White',   patterns: ['baylor scott','baylor white'] },
-  { name: 'Texas Health Resources', patterns: ['texas health resources'] },
   { name: 'Methodist Health',       patterns: ['methodist health system','methodist dallas','methodist mansfield','methodist midlothian','methodist charlton','methodist southlake'] },
-  { name: 'Memorial Hermann',       patterns: ['memorial hermann','memorialhermann'] },
-  { name: 'Houston Methodist',      patterns: ['houston methodist','methodist hospital houston','houston methodist sugar land','houston methodist west','houston methodist willowbrook','houston methodist baytown','houston methodist clear lake','houston methodist the woodlands','houston methodist san jacinto'] },
-  { name: 'MD Anderson',            patterns: ['md anderson','anderson cancer'] },
-  { name: 'Baptist Health',         patterns: ['baptist health'] },
-  { name: 'Encompass Health',       patterns: ['encompass'] },
-  { name: 'LifePoint Health',       patterns: ['lifepoint'] },
-  { name: 'Community Health Systems', patterns: ['community health systems','chs hospital'] },
-  { name: 'Tenet Healthcare',       patterns: ['tenet'] },
-  { name: 'Universal Health',       patterns: ['universal health','uhs '] },
+  { name: 'SCL Health',             patterns: ['scl health'] },
+  { name: 'Dignity Health',         patterns: ['dignity health'] },
+  { name: 'Barnes-Jewish',          patterns: ['barnes-jewish','barnes jewish'] },
 ];
-
-// Build search tokens from a typed name — splits on spaces, dashes, common words
-function tokenize(str) {
-  // Only strip pure connector words — keep substantive words like 'health',
-  // 'methodist', 'memorial' etc. that distinguish one system from another.
-  var stopwords = new Set(['the','and','for','of','at','in','by','to','a','an']);
-  return str.toLowerCase()
-    .replace(/[^a-z0-9 ]/g, ' ')
-    .split(/\s+/)
-    .filter(function(w){ return w.length > 1 && !stopwords.has(w); });
-}
-
-// Score how well a facility name matches the typed target (0 = no match)
-function matchScore(facilityName, targetTokens) {
-  if (!facilityName) return 0;
-  const fn = facilityName.toLowerCase();
-  let score = 0;
-  targetTokens.forEach(function(tok) {
-    if (fn.includes(tok)) score++;
-  });
-  return score;
-}
-
-function groupBySystem(facilities, targetInput) {
-  const systems = {};
-  const targetTokens = tokenize(targetInput);
-  const targetLower  = targetInput.toLowerCase();
-  // Pre-compute target domain if user typed a known system name
-  var targetDomain = null;
-  if (typeof DOMAIN_SYSTEM_MAP !== 'undefined') {
-    Object.entries(DOMAIN_SYSTEM_MAP).forEach(function(entry) {
-      if (entry[1].toLowerCase() === targetLower ||
-          entry[1].toLowerCase().includes(targetLower) ||
-          targetLower.includes(entry[1].toLowerCase().split(' ')[0])) {
-        targetDomain = entry[0];
-      }
-    });
-  }
-
-facilities.forEach(function(f) {
-  const fLat = parseFloat(f.lat || (f.center && f.center.lat) || 0);
-  const fLon = parseFloat(f.lon || (f.center && f.center.lon) || 0);
-  if (!fLat || !fLon) return;
-  if (distM(lat, lon, fLat, fLon) > radiusM) return;
-
-  const rawName = (f.tags && f.tags.name) || f.name || '';
-  const npiOrg  = (f.tags && f.tags.npi_org) || '';
-  const name    = npiOrg.length > rawName.length ? npiOrg : rawName;
-  const nameLow = name.toLowerCase();
-
-  // _embeddedSystem is the authoritative attribution (same as Map Tool Step 0)
-  let bucket = f._embeddedSystem || (f.tags && f.tags._embeddedSystem) || null;
-
-  // Fall back to pattern matching if no embedded system
-  if (!bucket) bucket = matchByPatterns(nameLow);
-
-  // Target name matching
-  if (!bucket && targetTokens.length > 0) {
-    var score = 0;
-    targetTokens.forEach(function(t){ if (nameLow.includes(t)) score++; });
-    if (score === targetTokens.length) bucket = target;
-  }
-
-  if (!bucket) bucket = 'Independent / Community';
-  if (bucket === 'Independent / Community') return;
-
-  const bucketLow = bucket.toLowerCase();
-  const isTarget = bucketLow === targetLower ||
-                   bucketLow.includes(targetLower) ||
-                   targetLower.includes(bucketLow.split(' ')[0]);
-  if (isTarget) targetCount++;
-  else counts[bucket] = (counts[bucket] || 0) + 1;
-});
-
-    // ── Step -1: Check saved overrides by stable key (highest priority) ──────
-    var stableKey = overrideKey(h);
-    if (systemOverrides[stableKey]) {
-      bucket = systemOverrides[stableKey];
-    }
-
-    // ── Step 0: Use authoritative domain attribution from embedded data ──────
-    // This is the most reliable signal — the endpoint domain identifies
-    // exactly which EHR instance (= health system) the facility belongs to.
-    var facDomain = h.dom || (h.tags && h.tags.dom) || '';
-    var facSys    = h._embeddedSystem || (h.tags && h.tags._embeddedSystem) || '';
-
-    if (!bucket && facDomain && typeof DOMAIN_SYSTEM_MAP !== 'undefined') {
-      var mappedSys = DOMAIN_SYSTEM_MAP[facDomain];
-      if (mappedSys) {
-        // Check if this domain matches the target
-        if (facDomain === targetDomain ||
-            (targetTokens.length > 0 && matchScore(mappedSys, targetTokens) === targetTokens.length)) {
-          bucket = targetInput;
-        } else {
-          bucket = mappedSys;
-        }
-      }
-    }
-
-    // Use pre-assigned system from embedded data if available
-    if (!bucket && facSys) {
-      if (targetTokens.length > 0 && matchScore(facSys, targetTokens) === targetTokens.length) {
-        bucket = targetInput;
-      } else {
-        bucket = facSys;
-      }
-    }
-
-    // ── Step 1: Match against the typed target by name (fallback for OSM/NPI)
-    if (!bucket && targetTokens.length > 0 &&
-        matchScore(name, targetTokens) === targetTokens.length) {
-      bucket = targetInput;
-    }
-
-    // ── Step 2: Match against known parent health system names
-    if (!bucket) {
-      for (var i = 0; i < KNOWN_SYSTEMS.length; i++) {
-        var sys = KNOWN_SYSTEMS[i];
-        // Skip if this system matches the typed target (avoid double-claiming)
-        if (sys.name.toLowerCase() === targetLower ||
-            targetTokens.some(function(t){ return sys.name.toLowerCase().includes(t); })) continue;
-        for (var j = 0; j < sys.patterns.length; j++) {
-          var pat = sys.patterns[j];
-          // Use word-boundary check: pattern must appear as a whole phrase,
-          // not as a fragment inside another word
-          var patRx = new RegExp('(?:^|[\\s\\-,\\/])' + pat.replace(/[.*+?^${}()|[\]\\]/g,'\\$&') + '(?:[\\s\\-,\\/]|$)');
-          if (patRx.test(nameLow)) {
-            bucket = sys.name;
-            break;
-          }
-        }
-        if (bucket) break;
-      }
-    }
-
-    // ── Step 3: Anything unrecognized → "Independent / Community"
-    // No keyword-fragment bucketing — keeps the legend and insights clean.
-    if (!bucket) {
-      bucket = 'Independent / Community';
-    }
-
-    if (!systems[bucket]) systems[bucket] = [];
-    systems[bucket].push(h);
-  });
-
-  // ── Step 4: Dynamic auto-grouping ─────────────────────────────────────────
-  // Look at facilities still in "Independent / Community" and group any that
-  // share an uncommon prefix (3+ facilities with the same meaningful name start).
-  var indFacs = systems['Independent / Community'] || [];
-  if (indFacs.length > 0) {
-    var autoGroups = autoGroupByName(indFacs);
-    Object.keys(autoGroups).forEach(function(groupName) {
-      var grouped = autoGroups[groupName];
-      if (grouped.length >= 3) {
-        // Move these out of Independent into their own bucket
-        systems['Independent / Community'] = (systems['Independent / Community'] || [])
-          .filter(function(f) { return !grouped.some(function(g) { return g.id === f.id; }); });
-        if (!systems[groupName]) systems[groupName] = [];
-        systems[groupName] = systems[groupName].concat(grouped);
-      }
-    });
-    // Clean up empty Independent bucket
-    if (systems['Independent / Community'] && systems['Independent / Community'].length === 0) {
-      delete systems['Independent / Community'];
-    }
-  }
-
-  return systems;
-}
-
-// ── Auto-grouping by shared name prefix ───────────────────────────────────────
-// Common generic words that should NOT trigger auto-grouping on their own
-const AUTO_GROUP_STOPWORDS = new Set([
-  // Articles / prepositions
-  'the','and','of','at','in','for','a','an','by','to','with',
-  // Generic healthcare words
-  'medical','health','care','center','centre','clinic','hospital',
-  'medicine','group','associates','services','system','network',
-  'practice','practices','physicians','physician','doctors','doctor',
-  'regional','community','general','national','university','institute',
-  'wellness','healthcare','specialty','specialist','specialists',
-  'ambulatory','surgical','surgery','outpatient','inpatient',
-  // Directional / generic location words
-  'new','old','north','south','east','west','central','upper','lower',
-  'greater','metro','metropolitan','suburban','downtown','midtown',
-  // Religious / system branding words
-  'saint','st','mt','mount','holy','sacred','mercy','providence',
-  'memorial','foundation','partners','alliance','integrated',
-  // State abbreviations that appear in names
-  'ma','ct','ri','nh','vt','me','ny','nj','pa',
-  // Common city names that appear as prefixes
-  'boston','cambridge','worcester','springfield','lowell','newton',
-  'quincy','brockton','lynn','somerville','fall','new','framingham',
-  // Words that trail off into location (causing truncation)
-  'faculty','harvard','for','by','at','with','via'
-]);
-
-function autoGroupByName(facilities) {
-  var groups = {};
-
-  facilities.forEach(function(f) {
-    var name = (f.tags && f.tags.name) ? f.tags.name : '';
-    if (!name) return;
-
-    var words = name.toLowerCase()
-      .replace(/[^a-z0-9\s]/g, ' ')
-      .split(/\s+/)
-      .filter(function(w) { return w.length > 1; });
-
-    // Try prefix lengths from 3 words down to 2
-    for (var len = Math.min(4, words.length); len >= 2; len--) {
-      var prefix = words.slice(0, len);
-
-      // Skip if ALL words are stopwords
-      var meaningfulWords = prefix.filter(function(w) { return !AUTO_GROUP_STOPWORDS.has(w); });
-      if (meaningfulWords.length === 0) continue;
-
-      // Skip if the FIRST word is a stopword — too generic
-      if (AUTO_GROUP_STOPWORDS.has(prefix[0])) continue;
-
-      // Need at least one truly distinctive word (not a stopword) in first 2 words
-      var firstTwoMeaningful = prefix.slice(0, 2).filter(function(w) { return !AUTO_GROUP_STOPWORDS.has(w); });
-      if (firstTwoMeaningful.length === 0) continue;
-
-      // If first word is meaningful and short (likely acronym), allow full prefix even with stopwords
-      var firstWord = prefix[0];
-      var isAcronym = firstWord.length <= 5 && /^[a-z]+$/.test(firstWord);
-      // For acronym-led names, use just the first 3 words as the key (e.g. "afc urgent care")
-      if (isAcronym && len > 3) continue; // don't use 4-word prefixes for acronyms
-
-      var key = prefix.join(' ');
-
-      // Capitalize properly for display
-      // Rebuild display name from ORIGINAL facility name words, not lowercased
-      var origWords = name.split(/\s+/);
-      var displayName = prefix.map(function(w, wi) {
-        // Find the original casing for this word position
-        var orig = origWords[wi] || w;
-        // If original is all-caps and short (acronym like AFC, ER), preserve it
-        if (orig.length <= 4 && orig === orig.toUpperCase() && /^[A-Z]+$/.test(orig)) return orig;
-        return AUTO_GROUP_STOPWORDS.has(w) ? w : (orig.charAt(0).toUpperCase() + orig.slice(1).toLowerCase());
-      }).join(' ');
-
-      if (!groups[displayName]) groups[displayName] = [];
-
-      // Only add if not already in a longer prefix group
-      var alreadyGrouped = Object.keys(groups).some(function(g) {
-        return g !== displayName && g.toLowerCase().startsWith(key) &&
-               groups[g].some(function(gf) { return gf.id === f.id; });
-      });
-
-      if (!alreadyGrouped) {
-        groups[displayName].push(f);
-        break; // Use the longest matching prefix
-      }
-    }
-  });
-
-  // Remove groups where facilities actually belong to a longer/more specific group
-  // Keep only the most specific match per facility
-  var finalGroups = {};
-  var assigned = new Set();
-
-  // Sort by prefix length descending — longer prefix = more specific
-  Object.keys(groups).sort(function(a, b) { return b.length - a.length; }).forEach(function(gName) {
-    var unassigned = groups[gName].filter(function(f) { return !assigned.has(f.id); });
-    if (unassigned.length >= 3) {
-      finalGroups[gName] = unassigned;
-      unassigned.forEach(function(f) { assigned.add(f.id); });
-    }
-  });
-
-  return finalGroups;
-}
-
 
 // ── Icon index helpers ────────────────────────────────────────────────────────
 async function readIconIndex(sasToken) {
@@ -660,7 +322,7 @@ async function readIconIndex(sasToken) {
 
 async function updateIconIndex(sasToken, system, op) {
   let systems = [];
-  try { systems = await readIconIndex(sasToken); } catch(e) { /* start fresh */ }
+  try { systems = await readIconIndex(sasToken); } catch(e) {}
   if (op === 'add') {
     if (!systems.includes(system)) systems.push(system);
   } else {
@@ -673,15 +335,11 @@ let qhinCache = null, qhinCacheTime = 0;
 const CACHE_TTL = 60 * 60 * 1000;
 
 // ── Referral Flow Model Constants ─────────────────────────────────────────────
-// Based on Care Continuity ED-to-Specialist Value Model (50k patient base).
-// These are the fixed assumptions from the spreadsheet model. All margin figures
-// are per-referral-completion values derived from the 100k ED visit baseline,
-// scaled to 50k for the demo pool.
 const REFERRAL_MODEL = {
   totalPool: 50000,
-  edVisitRate: 0.82,          // 82% of visits become discharges
-  referralRate: 0.23,          // 23% of discharges referred to targeted specialties
-  baseCompletionRate: 0.40,    // 40% current in-network completion rate
+  edVisitRate: 0.82,
+  referralRate: 0.23,
+  baseCompletionRate: 0.40,
   specialties: {
     cardiovascular:    { share: 0.16, opMargin: 218,  ipMargin: 7228, surgMargin: 4749, opRate: 0.11, ipRate: 0.05, surgRate: 0.02 },
     gastroenterology:  { share: 0.18, opMargin: 205,  ipMargin: 6771, surgMargin: 864,  opRate: 0.12, ipRate: 0.09, surgRate: 0.06 },
@@ -695,113 +353,73 @@ const REFERRAL_MODEL = {
   }
 };
 
-// Compute referral flow data for a set of competitor systems.
-// competitorSystems: array of { name, marketShare, lat, lon, facilityId }
-// targetSystem: { name, lat, lon }
-// Returns the full referral flow payload stored as referral_flows.json per system.
 function computeReferralFlows(targetSystem, competitorSystems) {
   const pool = REFERRAL_MODEL.totalPool;
   const edDischarges = Math.round(pool * REFERRAL_MODEL.edVisitRate);
   const totalReferrals = Math.round(edDischarges * REFERRAL_MODEL.referralRate);
   const completedInNetwork = Math.round(totalReferrals * REFERRAL_MODEL.baseCompletionRate);
   const totalLost = totalReferrals - completedInNetwork;
-
-  // Normalize competitor market shares to sum to 1.0 so leakage distribution is clean.
   const totalShare = competitorSystems.reduce(function(sum, c) { return sum + (c.marketShare || 0); }, 0);
   const normalizedCompetitors = competitorSystems.map(function(c) {
     return Object.assign({}, c, { normalizedShare: totalShare > 0 ? (c.marketShare || 0) / totalShare : 1 / competitorSystems.length });
   });
-
-  // Build per-specialty breakdown.
   const specialtyFlows = {};
   var totalMarginAtRisk = 0;
-
   Object.keys(REFERRAL_MODEL.specialties).forEach(function(key) {
     const spec = REFERRAL_MODEL.specialties[key];
     const specReferrals = Math.round(totalReferrals * spec.share);
     const specCompleted = Math.round(specReferrals * REFERRAL_MODEL.baseCompletionRate);
     const specLost = specReferrals - specCompleted;
-
-    // Downstream margin at risk = lost referrals * downstream utilization * margin per visit type
-    const opMarginAtRisk    = specLost * spec.opRate   * spec.opMargin;
-    const ipMarginAtRisk    = specLost * spec.ipRate   * spec.ipMargin;
-    const surgMarginAtRisk  = specLost * spec.surgRate * spec.surgMargin;
-    const totalSpecMargin   = opMarginAtRisk + ipMarginAtRisk + surgMarginAtRisk;
+    const opMarginAtRisk   = specLost * spec.opRate   * spec.opMargin;
+    const ipMarginAtRisk   = specLost * spec.ipRate   * spec.ipMargin;
+    const surgMarginAtRisk = specLost * spec.surgRate * spec.surgMargin;
+    const totalSpecMargin  = opMarginAtRisk + ipMarginAtRisk + surgMarginAtRisk;
     totalMarginAtRisk += totalSpecMargin;
-
-    // Distribute lost referrals across competitors by normalized market share.
     const competitorAllocations = normalizedCompetitors.map(function(c) {
       return {
-        facilityId:   c.facilityId || null,
-        name:         c.name,
-        lat:          c.lat,
-        lon:          c.lon,
-        marketShare:  c.marketShare,
+        facilityId: c.facilityId || null, name: c.name, lat: c.lat, lon: c.lon,
+        marketShare: c.marketShare,
         lostReferrals: Math.round(specLost * c.normalizedShare),
         marginAtRisk: Math.round(totalSpecMargin * c.normalizedShare)
       };
     });
-
     specialtyFlows[key] = {
-      displayName:         formatSpecialtyName(key),
-      totalReferrals:      specReferrals,
-      completedInNetwork:  specCompleted,
-      lostReferrals:       specLost,
-      leakageRate:         specLost / specReferrals,
-      marginAtRisk:        Math.round(totalSpecMargin),
+      displayName: formatSpecialtyName(key), totalReferrals: specReferrals,
+      completedInNetwork: specCompleted, lostReferrals: specLost,
+      leakageRate: specLost / specReferrals, marginAtRisk: Math.round(totalSpecMargin),
       competitorAllocations: competitorAllocations
     };
   });
-
-  // Build top-level competitor summary (aggregate across all specialties).
   const competitorSummary = normalizedCompetitors.map(function(c) {
     var totalLostToComp = 0, totalMarginToComp = 0;
     Object.values(specialtyFlows).forEach(function(sf) {
       const alloc = sf.competitorAllocations.find(function(a) { return a.name === c.name; });
-      if (alloc) {
-        totalLostToComp  += alloc.lostReferrals;
-        totalMarginToComp += alloc.marginAtRisk;
-      }
+      if (alloc) { totalLostToComp += alloc.lostReferrals; totalMarginToComp += alloc.marginAtRisk; }
     });
     return {
-      facilityId:   c.facilityId || null,
-      name:         c.name,
-      lat:          c.lat,
-      lon:          c.lon,
-      marketShare:  c.marketShare,
-      totalLostReferrals: totalLostToComp,
-      totalMarginAtRisk:  totalMarginToComp,
-      leakageShare: totalLostToComp / totalLost
+      facilityId: c.facilityId || null, name: c.name, lat: c.lat, lon: c.lon,
+      marketShare: c.marketShare, totalLostReferrals: totalLostToComp,
+      totalMarginAtRisk: totalMarginToComp, leakageShare: totalLostToComp / totalLost
     };
   });
-
   return {
-    generatedAt:        new Date().toISOString(),
-    targetSystem:       targetSystem.name,
-    targetLat:          targetSystem.lat,
-    targetLon:          targetSystem.lon,
-    patientPool:        pool,
-    totalReferrals:     totalReferrals,
-    completedInNetwork: completedInNetwork,
-    totalLost:          totalLost,
+    generatedAt: new Date().toISOString(), targetSystem: targetSystem.name,
+    targetLat: targetSystem.lat, targetLon: targetSystem.lon,
+    patientPool: pool, totalReferrals: totalReferrals,
+    completedInNetwork: completedInNetwork, totalLost: totalLost,
     overallLeakageRate: totalLost / totalReferrals,
-    totalMarginAtRisk:  Math.round(totalMarginAtRisk),
-    specialtyFlows:     specialtyFlows,
-    competitorSummary:  competitorSummary
+    totalMarginAtRisk: Math.round(totalMarginAtRisk),
+    specialtyFlows: specialtyFlows, competitorSummary: competitorSummary
   };
 }
 
 function formatSpecialtyName(key) {
   const names = {
-    cardiovascular:   'Cardiovascular',
-    gastroenterology: 'Gastroenterology',
-    generalMedicine:  'General Medicine',
-    neurosciences:    'Neurosciences',
-    orthopedics:      'Orthopedics',
-    spine:            'Spine',
-    surgeryENT:       'Surgery — ENT',
-    surgeryGeneral:   'Surgery — General',
-    surgeryUrology:   'Surgery — Urology'
+    cardiovascular: 'Cardiovascular', gastroenterology: 'Gastroenterology',
+    generalMedicine: 'General Medicine', neurosciences: 'Neurosciences',
+    orthopedics: 'Orthopedics', spine: 'Spine',
+    surgeryENT: 'Surgery — ENT', surgeryGeneral: 'Surgery — General',
+    surgeryUrology: 'Surgery — Urology'
   };
   return names[key] || key;
 }
@@ -809,15 +427,7 @@ function formatSpecialtyName(key) {
 // ── Netlify Function handler ───────────────────────────────────────────────────
 exports.handler = async function(event, context) {
   if (event.httpMethod === 'OPTIONS') {
-    return {
-      statusCode: 200,
-      headers: {
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-        'Access-Control-Allow-Headers': 'Content-Type'
-      },
-      body: ''
-    };
+    return { statusCode: 200, headers: CORS_HEADERS, body: '' };
   }
 
   const params = event.queryStringParameters || {};
@@ -828,15 +438,12 @@ exports.handler = async function(event, context) {
 
   try {
 
-    // ── debug ───────────────────────────────────────────────────────────────
+    // ── debug ────────────────────────────────────────────────────────────────
     if (action === 'debug') {
       return jsonResponse(200, {
-        hasSasToken: sasToken.length > 0,
-        sasLength: sasToken.length,
-        nodeVersion: process.version,
-        qhinCached: qhinCache ? qhinCache.length : 0,
-        action: action,
-        platform: 'netlify'
+        hasSasToken: sasToken.length > 0, sasLength: sasToken.length,
+        nodeVersion: process.version, qhinCached: qhinCache ? qhinCache.length : 0,
+        action: action, platform: 'netlify'
       });
     }
 
@@ -877,9 +484,7 @@ exports.handler = async function(event, context) {
         const raw = await fetchText(getBlobUrl(sasToken, 'app-state', 'geocode_cache.json'));
         const cache = JSON.parse(raw);
         const entry = cache[cacheKey];
-        if (entry && entry.lat && entry.lon) {
-          return jsonResponse(200, { hit: true, lat: entry.lat, lon: entry.lon });
-        }
+        if (entry && entry.lat && entry.lon) return jsonResponse(200, { hit: true, lat: entry.lat, lon: entry.lon });
         return jsonResponse(200, { hit: false });
       } catch(err) {
         if (err.message && err.message.startsWith('404')) return jsonResponse(200, { hit: false });
@@ -897,7 +502,7 @@ exports.handler = async function(event, context) {
         try {
           const raw = await fetchText(getBlobUrl(sasToken, 'app-state', 'geocode_cache.json'));
           cache = JSON.parse(raw);
-        } catch(e) { /* cache doesn't exist yet */ }
+        } catch(e) {}
         const ts = new Date().toISOString();
         Object.keys(newEntries).forEach(function(k) {
           cache[k] = { lat: newEntries[k].lat, lon: newEntries[k].lon, ts: ts };
@@ -983,99 +588,145 @@ exports.handler = async function(event, context) {
       }
     }
 
-// ── competitors-near ─────────────────────────────────────────────────────────
-if (action === 'competitors-near') {
-  const lat    = parseFloat(params.lat   || '0');
-  const lon    = parseFloat(params.lon   || '0');
-  const miles  = parseFloat(params.miles || '25');
-  const target = (params.target || '').toLowerCase().trim();
-  if (!lat || !lon) return jsonResponse(400, { error: 'lat and lon required' });
-  const radiusM = miles * 1609.34;
+    // ── competitors-near ──────────────────────────────────────────────────────
+    if (action === 'competitors-near') {
+      const lat    = parseFloat(params.lat   || '0');
+      const lon    = parseFloat(params.lon   || '0');
+      const miles  = parseFloat(params.miles || '25');
+      const target = (params.target || '').trim();
+      if (!lat || !lon) return jsonResponse(400, { error: 'lat and lon required' });
+      const radiusM = miles * 1609.34;
+      const targetLower = target.toLowerCase();
 
-  try {
-    // Load state and QHIN in parallel
-    if (!qhinCache || (Date.now() - qhinCacheTime) >= CACHE_TTL) {
-      const raw = await fetchText(getBlobUrl(sasToken, 'qhin-data', 'facilities.json'));
-      qhinCache     = JSON.parse(raw);
-      qhinCacheTime = Date.now();
+      function tokenizeR(str) {
+        var stop = new Set(['the','and','for','of','at','in','by','to','a','an']);
+        return str.toLowerCase().replace(/[^a-z0-9 ]/g,' ').split(/\s+/)
+          .filter(function(w){ return w.length > 1 && !stop.has(w); });
+      }
+
+      try {
+        if (!qhinCache || (Date.now() - qhinCacheTime) >= CACHE_TTL) {
+          const raw = await fetchText(getBlobUrl(sasToken, 'qhin-data', 'facilities.json'));
+          qhinCache     = JSON.parse(raw);
+          qhinCacheTime = Date.now();
+        }
+        const facilities = Array.isArray(qhinCache) ? qhinCache : (qhinCache.facilities || []);
+
+        let overrides = {};
+        try {
+          const stateRaw = await fetchText(getBlobUrl(sasToken, 'app-state', 'shared-state.json'));
+          overrides = JSON.parse(stateRaw).overrides || {};
+        } catch(e) {}
+
+        function distM(lat1, lon1, lat2, lon2) {
+          const R = 6371000, dLat=(lat2-lat1)*Math.PI/180, dLon=(lon2-lon1)*Math.PI/180;
+          const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)**2;
+          return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+        }
+
+        const targetTokens = tokenizeR(target);
+
+        function matchByPatterns(nameLow) {
+          for (var i = 0; i < KNOWN_SYSTEMS.length; i++) {
+            var sys = KNOWN_SYSTEMS[i];
+            var sysLow = sys.name.toLowerCase();
+            if (sysLow === targetLower || targetTokens.some(function(t){ return sysLow.includes(t); })) continue;
+            for (var j = 0; j < sys.patterns.length; j++) {
+              var pat = sys.patterns[j];
+              var rx = new RegExp('(?:^|[\\s\\-,\\/])' + pat.replace(/[.*+?^${}()|[\]\\]/g,'\\$&') + '(?:[\\s\\-,\\/]|$)');
+              if (rx.test(nameLow) || nameLow.startsWith(pat)) return sys.name;
+            }
+          }
+          return null;
+        }
+
+        const counts = {};
+        let targetCount = 0;
+
+        facilities.forEach(function(f) {
+          const fLat = parseFloat(f.lat || (f.center && f.center.lat) || 0);
+          const fLon = parseFloat(f.lon || (f.center && f.center.lon) || 0);
+          if (!fLat || !fLon) return;
+          if (distM(lat, lon, fLat, fLon) > radiusM) return;
+
+          const rawName = (f.tags && f.tags.name) || f.name || '';
+          const npiOrg  = (f.tags && f.tags.npi_org) || '';
+          const name    = npiOrg.length > rawName.length ? npiOrg : rawName;
+          const nameLow = name.toLowerCase();
+
+          // _embeddedSystem is authoritative attribution
+          let bucket = f._embeddedSystem || (f.tags && f.tags._embeddedSystem) || null;
+
+          // Check overrides (key format: "name|lat|lon")
+          if (!bucket) {
+            const oKey = name.toLowerCase() + '|' + fLat.toFixed(3) + '|' + fLon.toFixed(3);
+            bucket = overrides[oKey] || null;
+          }
+
+          // Pattern matching against KNOWN_SYSTEMS
+          if (!bucket) bucket = matchByPatterns(nameLow);
+
+          // Target name matching
+          if (!bucket && targetTokens.length > 0) {
+            var score = 0;
+            targetTokens.forEach(function(t){ if (nameLow.includes(t)) score++; });
+            if (score === targetTokens.length) bucket = target;
+          }
+
+          if (!bucket) bucket = 'Independent / Community';
+          if (bucket === 'Independent / Community') return;
+
+          const bucketLow = bucket.toLowerCase();
+          const isTarget = bucketLow === targetLower ||
+                           bucketLow.includes(targetLower) ||
+                           targetLower.includes(bucketLow.split(' ')[0]);
+          if (isTarget) targetCount++;
+          else counts[bucket] = (counts[bucket] || 0) + 1;
+        });
+
+        const total = targetCount + Object.values(counts).reduce((a,b)=>a+b,0);
+        const competitors = Object.entries(counts)
+          .sort((a,b) => b[1]-a[1])
+          .slice(0, 16)
+          .map(([name, count]) => ({
+            name, count,
+            share: total > 0 ? Math.round(count/total*100) : 0
+          }));
+
+        return jsonResponse(200, { competitors, targetCount, total, center:{lat,lon}, miles });
+      } catch(err) {
+        return jsonResponse(502, { error: 'competitors-near failed', detail: err.message });
+      }
     }
-    const facilities = Array.isArray(qhinCache) ? qhinCache : (qhinCache.facilities || []);
 
-    let overrides = {};
-    try {
-      const stateRaw = await fetchText(getBlobUrl(sasToken, 'app-state', 'shared-state.json'));
-      overrides = JSON.parse(stateRaw).overrides || {};
-    } catch(e) { /* no overrides */ }
-
-    function distM(lat1, lon1, lat2, lon2) {
-      const R = 6371000, dLat = (lat2-lat1)*Math.PI/180, dLon = (lon2-lon1)*Math.PI/180;
-      const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)**2;
-      return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    // ── debug-facilities ──────────────────────────────────────────────────────
+    if (action === 'debug-facilities') {
+      const dlat = parseFloat(params.lat || '42.345');
+      const dlon = parseFloat(params.lon || '-71.090');
+      const dradiusM = 25 * 1609.34;
+      if (!qhinCache || (Date.now() - qhinCacheTime) >= CACHE_TTL) {
+        const raw = await fetchText(getBlobUrl(sasToken, 'qhin-data', 'facilities.json'));
+        qhinCache = JSON.parse(raw);
+        qhinCacheTime = Date.now();
+      }
+      const dfacilities = Array.isArray(qhinCache) ? qhinCache : (qhinCache.facilities || []);
+      function ddistM(a,b,c,d){const R=6371000,dL=(c-a)*Math.PI/180,dl=(d-b)*Math.PI/180;const x=Math.sin(dL/2)**2+Math.cos(a*Math.PI/180)*Math.cos(c*Math.PI/180)*Math.sin(dl/2)**2;return R*2*Math.atan2(Math.sqrt(x),Math.sqrt(1-x));}
+      const nearby = dfacilities.filter(function(f) {
+        const fLat = parseFloat(f.lat||(f.center&&f.center.lat)||0);
+        const fLon = parseFloat(f.lon||(f.center&&f.center.lon)||0);
+        return fLat && fLon && ddistM(dlat,dlon,fLat,fLon) <= dradiusM;
+      }).slice(0, 10);
+      return jsonResponse(200, { count: nearby.length, sample: nearby.map(function(f) {
+        return {
+          keys: Object.keys(f).join(','),
+          name: f.name, tags_name: f.tags && f.tags.name,
+          tags_npi: f.tags && f.tags.npi_org,
+          embeddedSystem: f._embeddedSystem,
+          lat: f.lat, lon: f.lon
+        };
+      })});
     }
 
-    // Build override lookup by stable key (name|lat|lon format)
-    const overrideLookup = {};
-    Object.entries(overrides).forEach(function([key, sysName]) {
-      const parts = key.split('|');
-      if (parts.length === 3) {
-        overrideLookup[key] = sysName;
-      }
-    });
-
-    const counts = {};
-    let targetCount = 0;
-
-    facilities.forEach(function(f) {
-      const fLat = parseFloat(f.lat || (f.center && f.center.lat) || 0);
-      const fLon = parseFloat(f.lon || (f.center && f.center.lon) || 0);
-      if (!fLat || !fLon) return;
-      if (distM(lat, lon, fLat, fLon) > radiusM) return;
-
-      // Check overrides first
-      const name = (f.tags && f.tags.name) || f.name || '';
-      const nameLow = name.toLowerCase();
-      const stableKey = name.toLowerCase().replace(/\s+/g,'_') + '|' + fLat.toFixed(3) + '|' + fLon.toFixed(3);
-      
-      let bucket = overrides[stableKey] || null;
-
-      // Name-based target match
-      if (!bucket && target && nameLow.includes(target.split(' ')[0])) {
-        bucket = params.target;
-      }
-
-      if (!bucket) bucket = 'Independent / Community';
-      if (bucket === 'Independent / Community') return;
-
-      const bucketLow = bucket.toLowerCase();
-      if (target && (bucketLow === target || bucketLow.includes(target) || target.includes(bucketLow.split(' ')[0]))) {
-        targetCount++;
-      } else {
-        counts[bucket] = (counts[bucket] || 0) + 1;
-      }
-    });
-
-    const total = targetCount + Object.values(counts).reduce((a, b) => a + b, 0);
-    const competitors = Object.entries(counts)
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 16)
-      .map(([name, count]) => ({
-        name,
-        count,
-        share: total > 0 ? Math.round(count / total * 100) : 0
-      }));
-
-    return jsonResponse(200, {
-      competitors,
-      targetCount,
-      total,
-      center: { lat, lon },
-      miles
-    });
-  } catch(err) {
-    return jsonResponse(502, { error: 'competitors-near failed', detail: err.message });
-  }
-}
-    
     // ── state-save ───────────────────────────────────────────────────────────
     if (action === 'state-save') {
       if (!sasToken) return jsonResponse(500, { error: 'SAS token not configured' });
@@ -1363,7 +1014,7 @@ if (action === 'competitors-near') {
         try {
           const raw = await fetchText(getBlobUrl(sasToken, 'app-state', 'search_cache.json'));
           cache = JSON.parse(raw);
-        } catch(e) { /* start fresh */ }
+        } catch(e) {}
         const now = Date.now();
         Object.keys(cache).forEach(function(k) {
           if (now - new Date(cache[k].ts).getTime() > 30 * 24 * 60 * 60 * 1000) delete cache[k];
@@ -1377,13 +1028,6 @@ if (action === 'competitors-near') {
     }
 
     // ── referral-flows-compute ────────────────────────────────────────────────
-    // Computes referral flow data for a target system against a set of competitors,
-    // caches the result to Blob Storage, and returns it.
-    // POST body: {
-    //   targetSystem: { name, lat, lon },
-    //   competitors: [ { name, marketShare, lat, lon, facilityId? }, ... ],
-    //   forceRefresh: boolean  (optional — skip cache and recompute)
-    // }
     if (action === 'referral-flows-compute') {
       if (!sasToken) return jsonResponse(500, { error: 'SAS token not configured' });
       let body;
@@ -1393,49 +1037,30 @@ if (action === 'competitors-near') {
       const { targetSystem, competitors, forceRefresh } = body;
       if (!targetSystem || !targetSystem.name) return jsonResponse(400, { error: 'targetSystem.name required' });
       if (!Array.isArray(competitors) || competitors.length === 0) return jsonResponse(400, { error: 'competitors array required' });
-
-      // Build a stable cache key from target name + sorted competitor names.
       const cacheKey = 'flows_' + targetSystem.name.toLowerCase().replace(/[^a-z0-9]/g, '_')
         + '_' + competitors.map(function(c) { return c.name; }).sort().join('_').toLowerCase().replace(/[^a-z0-9_]/g, '_').substring(0, 80);
       const blobName = cacheKey + '.json';
-
-      // Try cache first unless forceRefresh requested.
       if (!forceRefresh) {
         try {
           const cached = await fetchText(getBlobUrl(sasToken, 'referral-flows', blobName));
           const parsed = JSON.parse(cached);
-          // Return cached result with a flag so client knows it was cached.
           return jsonResponse(200, Object.assign({ _cached: true }, parsed));
-        } catch(e) {
-          // Cache miss or 404 — compute fresh below.
-        }
+        } catch(e) {}
       }
-
-      // Compute fresh.
       const flowData = computeReferralFlows(targetSystem, competitors);
-
-      // Persist to blob for next time.
       try {
         await putText(getBlobUrl(sasToken, 'referral-flows', blobName), JSON.stringify(flowData), 'application/json');
       } catch(e) {
         console.warn('Could not cache referral flows: ' + e.message);
-        // Non-fatal — still return the computed data.
       }
-
       return jsonResponse(200, Object.assign({ _cached: false }, flowData));
     }
 
     // ── referral-flows-load ───────────────────────────────────────────────────
-    // Loads a previously computed referral flow blob by target system name.
-    // Useful for the standalone HubSpot modal to fetch without recomputing.
-    // ?action=referral-flows-load&system=mass_general_brigham
     if (action === 'referral-flows-load') {
       if (!sasToken) return jsonResponse(500, { error: 'SAS token not configured' });
       const systemKey = (params.system || '').toLowerCase().replace(/[^a-z0-9]/g, '_');
       if (!systemKey) return jsonResponse(400, { error: 'system param required' });
-      // List all blobs matching this system prefix by trying the blob directly.
-      // The client is expected to pass the full cache key, or just the system name
-      // to get the most recently computed flows for that system.
       const blobName = 'flows_' + systemKey + '_latest.json';
       try {
         const raw = await fetchText(getBlobUrl(sasToken, 'referral-flows', blobName));
@@ -1448,145 +1073,6 @@ if (action === 'competitors-near') {
       }
     }
 
-    // ── referral-flows-save-latest ────────────────────────────────────────────
-    // After computing flows, also write a "latest" alias blob so the standalone
-    // modal can always fetch the most recent computation for a system without
-    // knowing the full cache key. Called automatically by referral-flows-compute.
-    // This is handled internally — not a public route.
-
-// ── competitors-near ─────────────────────────────────────────────────────
-    if (action === 'competitors-near') {
-      const lat    = parseFloat(params.lat   || '0');
-      const lon    = parseFloat(params.lon   || '0');
-      const miles  = parseFloat(params.miles || '25');
-      const target = (params.target || '').trim();
-      if (!lat || !lon) return jsonResponse(400, { error: 'lat and lon required' });
-      const radiusM = miles * 1609.34;
-      const targetLower = target.toLowerCase();
-
-      function tokenizeR(str) {
-        var stop = new Set(['the','and','for','of','at','in','by','to','a','an']);
-        return str.toLowerCase().replace(/[^a-z0-9 ]/g,' ').split(/\s+/)
-          .filter(function(w){ return w.length > 1 && !stop.has(w); });
-      }
-
-      try {
-        if (!qhinCache || (Date.now() - qhinCacheTime) >= CACHE_TTL) {
-          const raw = await fetchText(getBlobUrl(sasToken, 'qhin-data', 'facilities.json'));
-          qhinCache     = JSON.parse(raw);
-          qhinCacheTime = Date.now();
-        }
-        const facilities = Array.isArray(qhinCache) ? qhinCache : (qhinCache.facilities || []);
-
-        let overrides = {};
-        try {
-          const stateRaw = await fetchText(getBlobUrl(sasToken, 'app-state', 'shared-state.json'));
-          overrides = JSON.parse(stateRaw).overrides || {};
-        } catch(e) {}
-
-        function distM(lat1, lon1, lat2, lon2) {
-          const R = 6371000, dLat=(lat2-lat1)*Math.PI/180, dLon=(lon2-lon1)*Math.PI/180;
-          const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)**2;
-          return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-        }
-
-        const targetTokens = tokenizeR(target);
-
-        function matchByPatterns(nameLow) {
-          for (var i = 0; i < KNOWN_SYSTEMS.length; i++) {
-            var sys = KNOWN_SYSTEMS[i];
-            var sysLow = sys.name.toLowerCase();
-            // Skip systems that match the target
-            if (sysLow === targetLower || targetTokens.some(function(t){ return sysLow.includes(t); })) continue;
-            for (var j = 0; j < sys.patterns.length; j++) {
-              var pat = sys.patterns[j];
-              var rx = new RegExp('(?:^|[\\s\\-,\\/])' + pat.replace(/[.*+?^${}()|[\]\\]/g,'\\$&') + '(?:[\\s\\-,\\/]|$)');
-              if (rx.test(nameLow) || nameLow.startsWith(pat)) return sys.name;
-            }
-          }
-          return null;
-        }
-
-        const counts = {};
-        let targetCount = 0;
-
-        facilities.forEach(function(f) {
-          const fLat = parseFloat(f.lat || (f.center && f.center.lat) || 0);
-          const fLon = parseFloat(f.lon || (f.center && f.center.lon) || 0);
-          if (!fLat || !fLon) return;
-          if (distM(lat, lon, fLat, fLon) > radiusM) return;
-
-          const rawName = (f.tags && f.tags.name) || f.name || '';
-          const npiOrg  = (f.tags && f.tags.npi_org) || '';
-          const name    = npiOrg.length > rawName.length ? npiOrg : rawName;
-          const nameLow = name.toLowerCase();
-
-          // Check override first (key format: "name|lat|lon")
-          const oKey = name.toLowerCase() + '|' + fLat.toFixed(3) + '|' + fLon.toFixed(3);
-          let bucket = overrides[oKey] || null;
-
-          // Pattern matching against KNOWN_SYSTEMS
-          if (!bucket) bucket = matchByPatterns(nameLow);
-
-          // Target name matching
-          if (!bucket && targetTokens.length > 0) {
-            var score = 0;
-            targetTokens.forEach(function(t){ if (nameLow.includes(t)) score++; });
-            if (score === targetTokens.length) bucket = target;
-          }
-
-          if (!bucket) bucket = 'Independent / Community';
-          if (bucket === 'Independent / Community') return;
-
-          const bucketLow = bucket.toLowerCase();
-          const isTarget = bucketLow === targetLower ||
-                           bucketLow.includes(targetLower) ||
-                           targetLower.includes(bucketLow.split(' ')[0]);
-          if (isTarget) targetCount++;
-          else counts[bucket] = (counts[bucket] || 0) + 1;
-        });
-
-        const total = targetCount + Object.values(counts).reduce((a,b)=>a+b,0);
-        const competitors = Object.entries(counts)
-          .sort((a,b) => b[1]-a[1])
-          .slice(0, 16)
-          .map(([name, count]) => ({
-            name, count,
-            share: total > 0 ? Math.round(count/total*100) : 0
-          }));
-
-        return jsonResponse(200, { competitors, targetCount, total, center:{lat,lon}, miles });
-      } catch(err) {
-        return jsonResponse(502, { error: 'competitors-near failed', detail: err.message });
-      }
-    }
-
-// ── debug-facilities ─────────────────────────────────────────────────────────
-if (action === 'debug-facilities') {
-  const lat = parseFloat(params.lat || '42.345');
-  const lon = parseFloat(params.lon || '-71.090');
-  const radiusM = 25 * 1609.34;
-  if (!qhinCache || (Date.now() - qhinCacheTime) >= CACHE_TTL) {
-    const raw = await fetchText(getBlobUrl(sasToken, 'qhin-data', 'facilities.json'));
-    qhinCache = JSON.parse(raw);
-    qhinCacheTime = Date.now();
-  }
-  const facilities = Array.isArray(qhinCache) ? qhinCache : (qhinCache.facilities || []);
-  function distM(lat1,lon1,lat2,lon2){const R=6371000,dLat=(lat2-lat1)*Math.PI/180,dLon=(lon2-lon1)*Math.PI/180;const a=Math.sin(dLat/2)**2+Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)**2;return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));}
-  const nearby = facilities.filter(f => {
-    const fLat = parseFloat(f.lat||(f.center&&f.center.lat)||0);
-    const fLon = parseFloat(f.lon||(f.center&&f.center.lon)||0);
-    return fLat && fLon && distM(lat,lon,fLat,fLon) <= radiusM;
-  }).slice(0, 10);
-  return jsonResponse(200, { count: nearby.length, sample: nearby.map(f => ({
-    keys: Object.keys(f).join(','),
-    name: f.name, tags_name: f.tags && f.tags.name, 
-    tags_npi: f.tags && f.tags.npi_org,
-    lat: f.lat, lon: f.lon,
-    center: f.center
-  }))});
-}
-    
     return jsonResponse(404, { error: 'Unknown action: ' + action });
 
   } catch(topErr) {
