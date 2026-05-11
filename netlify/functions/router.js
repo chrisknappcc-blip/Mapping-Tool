@@ -637,8 +637,8 @@ exports.handler = async function(event, context) {
               var patWords = pat.trim().split(/\s+/).length;
               var rx = new RegExp('(?:^|[\\s\\-,\/])' + pat.replace(/[.*+?^${}()|[\\]\\]/g,'\\$&') + '(?:[\\s\\-,\/]|$)');
               if (rx.test(nameLow)) {
-                // Single-word patterns are too generic — only match short facility names
-                if (patWords === 1 && nameWords > 3) continue;
+                // Single-word patterns are too generic — only match exact or near-exact names
+                if (patWords === 1 && nameWords > 2) continue;
                 return sys.name;
               }
             }
