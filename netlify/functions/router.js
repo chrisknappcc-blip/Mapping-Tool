@@ -1532,6 +1532,32 @@ if (action === 'competitors-near') {
         return jsonResponse(502, { error: 'competitors-near failed', detail: err.message });
       }
     }
+
+// ── debug-facilities ─────────────────────────────────────────────────────────
+if (action === 'debug-facilities') {
+  const lat = parseFloat(params.lat || '42.345');
+  const lon = parseFloat(params.lon || '-71.090');
+  const radiusM = 25 * 1609.34;
+  if (!qhinCache || (Date.now() - qhinCacheTime) >= CACHE_TTL) {
+    const raw = await fetchText(getBlobUrl(sasToken, 'qhin-data', 'facilities.json'));
+    qhinCache = JSON.parse(raw);
+    qhinCacheTime = Date.now();
+  }
+  const facilities = Array.isArray(qhinCache) ? qhinCache : (qhinCache.facilities || []);
+  function distM(lat1,lon1,lat2,lon2){const R=6371000,dLat=(lat2-lat1)*Math.PI/180,dLon=(lon2-lon1)*Math.PI/180;const a=Math.sin(dLat/2)**2+Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)**2;return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));}
+  const nearby = facilities.filter(f => {
+    const fLat = parseFloat(f.lat||(f.center&&f.center.lat)||0);
+    const fLon = parseFloat(f.lon||(f.center&&f.center.lon)||0);
+    return fLat && fLon && distM(lat,lon,fLat,fLon) <= radiusM;
+  }).slice(0, 10);
+  return jsonResponse(200, { count: nearby.length, sample: nearby.map(f => ({
+    keys: Object.keys(f).join(','),
+    name: f.name, tags_name: f.tags && f.tags.name, 
+    tags_npi: f.tags && f.tags.npi_org,
+    lat: f.lat, lon: f.lon,
+    center: f.center
+  }))});
+}
     
     return jsonResponse(404, { error: 'Unknown action: ' + action });
 
