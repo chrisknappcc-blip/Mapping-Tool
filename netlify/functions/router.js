@@ -409,12 +409,40 @@ function groupBySystem(facilities, targetInput) {
     });
   }
 
-  facilities.forEach(function(h) {
-    var rawName = h.tags && h.tags.name ? h.tags.name : 'Unknown';
-    var npiOrg  = h.tags && h.tags.npi_org ? h.tags.npi_org : '';
-    const name    = (npiOrg.length > rawName.length) ? npiOrg : rawName;
-    const nameLow = name.toLowerCase();
-    let bucket    = null;
+facilities.forEach(function(f) {
+  const fLat = parseFloat(f.lat || (f.center && f.center.lat) || 0);
+  const fLon = parseFloat(f.lon || (f.center && f.center.lon) || 0);
+  if (!fLat || !fLon) return;
+  if (distM(lat, lon, fLat, fLon) > radiusM) return;
+
+  const rawName = (f.tags && f.tags.name) || f.name || '';
+  const npiOrg  = (f.tags && f.tags.npi_org) || '';
+  const name    = npiOrg.length > rawName.length ? npiOrg : rawName;
+  const nameLow = name.toLowerCase();
+
+  // _embeddedSystem is the authoritative attribution (same as Map Tool Step 0)
+  let bucket = f._embeddedSystem || (f.tags && f.tags._embeddedSystem) || null;
+
+  // Fall back to pattern matching if no embedded system
+  if (!bucket) bucket = matchByPatterns(nameLow);
+
+  // Target name matching
+  if (!bucket && targetTokens.length > 0) {
+    var score = 0;
+    targetTokens.forEach(function(t){ if (nameLow.includes(t)) score++; });
+    if (score === targetTokens.length) bucket = target;
+  }
+
+  if (!bucket) bucket = 'Independent / Community';
+  if (bucket === 'Independent / Community') return;
+
+  const bucketLow = bucket.toLowerCase();
+  const isTarget = bucketLow === targetLower ||
+                   bucketLow.includes(targetLower) ||
+                   targetLower.includes(bucketLow.split(' ')[0]);
+  if (isTarget) targetCount++;
+  else counts[bucket] = (counts[bucket] || 0) + 1;
+});
 
     // ── Step -1: Check saved overrides by stable key (highest priority) ──────
     var stableKey = overrideKey(h);
