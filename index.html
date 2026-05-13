@@ -2639,10 +2639,23 @@ function buildInsights() {
   const shareP      = total > 0 ? Math.round((targetCount/total)*100) : 0;
   const compShareP  = total > 0 ? Math.round((totalComp/total)*100) : 0;
 
-  const competitors = Object.entries(systems)
+const competitors = Object.entries(systems)
     .filter(([s]) => s !== targetKey && s !== 'Independent / Community')
     .map(([name,arr]) => ({ name, count: arr.length, share: total>0?Math.round((arr.length/total)*100):0 }))
     .sort((a,b) => b.count - a.count);
+
+  // Cache competitor results for CPIQ — keyed by lat|lon|radius
+  if (lastData && lastData._coords && competitors.length > 0) {
+    const cacheKey = 'comp|' + lastData._coords.lat.toFixed(3) + '|' + lastData._coords.lon.toFixed(3) + '|' + lastData._radius;
+    fetch('/.netlify/functions/router?action=search-cache-set', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        key: cacheKey,
+        facilities: { competitors: competitors, targetKey: targetKey, targetCount: targetCount, cachedAt: new Date().toISOString() }
+      })
+    }).catch(function() {});
+  }
 
   const indCount = systems['Independent / Community'] ? systems['Independent / Community'].length : 0;
   const totalCompCount = competitors.reduce((a,c)=>a+c.count,0);
@@ -3783,7 +3796,7 @@ async function searchThisArea() {
     resetColors();
     const systems = groupBySystem(facilities, target);
     const targetKey = findTargetKey(systems, target);
-    lastData = { systems, target, rawFacilities: facilities };
+    lastData = { systems, target, rawFacilities: facilities, _coords: coords, _radius: radius };
 
     // Suppress moveend from our own programmatic pan (none here — user already panned)
     buildLegend(systems, targetKey);
@@ -3860,7 +3873,7 @@ let facilities;
 
     const systems = groupBySystem(facilities, target);
     const targetKey = findTargetKey(systems, target);
-    lastData = { systems, target, rawFacilities: facilities };
+    lastData = { systems, target, rawFacilities: facilities, _coords: coords, _radius: radius };
 
     _exploreSearchPending = true;
     mapInstance.setView([coords.lat, coords.lon], 11);
