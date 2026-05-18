@@ -2646,7 +2646,7 @@ const competitors = Object.entries(systems)
 
   // Cache competitor results for CPIQ — keyed by lat|lon|radius
   if (lastData && lastData._coords && competitors.length > 0) {
-    const cacheKey = 'comp|' + lastData._coords.lat.toFixed(3) + '|' + lastData._coords.lon.toFixed(3) + '|' + lastData._radius;
+    const cacheKey = 'comp2|' + lastData._coords.lat.toFixed(3) + '|' + lastData._coords.lon.toFixed(3) + '|' + lastData._radius;
     fetch('/.netlify/functions/router?action=search-cache-set', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
